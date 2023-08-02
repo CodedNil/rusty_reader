@@ -59,46 +59,53 @@ struct Article {
     read_status: ReadStatus,
 }
 
+async fn process_source(source: &str, db: &sled::Db) -> Result<(), Box<dyn std::error::Error>> {
+    let response = reqwest::get(source).await?;
+    let bytes = response.bytes().await?;
+    let cursor = Cursor::new(bytes);
+    let feed = parser::parse(cursor)?;
+
+    for entry in feed.entries {
+        // If entry doesnt have title skip it
+        if entry.title.is_none() {
+            continue;
+        }
+        let entry_title = entry.title.unwrap().content;
+        let entry_summary = entry.summary.map_or_else(String::new, |s| s.content);
+
+        let entry_published = entry.published.unwrap_or_default();
+
+        let key = entry.id.clone();
+        let article = Article {
+            link: entry.id,
+            title: entry_title,
+            category: Category::Tech,
+            article_type: ArticleType::Article,
+            published: entry_published.to_string(),
+            image: String::new(),
+            summary: entry_summary,
+            read_status: ReadStatus::Fresh,
+        };
+        let value = bincode::encode_to_vec(article, config::standard()).unwrap();
+        db.insert(key, value)?;
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
-    let db = sled::open("database").unwrap();
+    let db = sled::open("database").expect("Failed to open the database");
 
     for source in rss_sources {
-        let response = reqwest::get(source)
-            .await
-            .expect("Failed to fetch the feed");
-        let bytes = response
-            .bytes()
-            .await
-            .expect("Failed to get bytes from the response");
-        let cursor = Cursor::new(bytes);
-        let feed = parser::parse(cursor).expect("Failed to parse the feed");
-
-        for entry in feed.entries {
-            // If entry doesnt have title skip it
-            if entry.title.is_none() {
-                continue;
-            }
-            let entry_title = entry.title.unwrap().content;
-            let entry_summary = entry.summary.map_or_else(String::new, |s| s.content);
-
-            let entry_published = entry.published.unwrap_or_default();
-
-            let key = entry.id.clone();
-            let article = Article {
-                link: entry.id,
-                title: entry_title,
-                category: Category::Tech,
-                article_type: ArticleType::Article,
-                published: entry_published.to_string(),
-                image: String::new(),
-                summary: entry_summary,
-                read_status: ReadStatus::Fresh,
-            };
-            let value = bincode::encode_to_vec(article, config::standard()).unwrap();
-            db.insert(key, value)?;
+        if let Err(e) = process_source(source, &db).await {
+            eprintln!("Failed to process source {source}: {e}");
         }
+    }
+
+    if let Err(e) = db.flush() {
+        eprintln!("Failed to flush the database: {e}");
     }
 
     Ok(())
