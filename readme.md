@@ -16,3 +16,10 @@ Categorise and tag
 Import and export opml
 
 Offline reading
+
+
+Top portion is article/video currently selected, keybind to expand
+3 Columns, archived, fresh, saved
+Navigate articles with wasd, as you move down the article selected comes to the top and previous one goes to bottom of list, cyclically
+Move sideways to save or archive
+QE to move between columns

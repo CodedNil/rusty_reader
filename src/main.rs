@@ -1,11 +1,6 @@
 use feed_rs::parser;
-use reqwest::Error;
 use serde_derive::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    fs::File,
-    io::{Cursor, Write},
-};
+use std::{fs::write, io::Cursor};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ReadStatus {
@@ -58,15 +53,21 @@ struct Article {
     title: String,
     category: Category,
     article_type: ArticleType,
+    published: String,
     image: String,
     summary: String,
     read_status: ReadStatus,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+struct Articles {
+    articles: Vec<Article>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
-    let mut articles = HashSet::new();
+    let mut articles = Vec::new();
 
     for source in rss_sources {
         let response = reqwest::get(source)
@@ -85,17 +86,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
             let entry_title = entry.title.unwrap().content;
+            let entry_summary = entry.summary.map_or_else(String::new, |s| s.content);
 
-            println!("Title: {}", entry_title);
-            println!("Link: {}", entry.id);
-            let entry_summary = entry.summary.map_or_else(|| String::new(), |s| s.content);
-            println!("Summary: {}", entry_summary);
+            let entry_published = entry.published.unwrap_or_default();
 
-            articles.insert(Article {
+            articles.push(Article {
                 link: entry.id,
                 title: entry_title,
                 category: Category::Tech,
                 article_type: ArticleType::Article,
+                published: entry_published.to_string(),
                 image: String::new(),
                 summary: entry_summary,
                 read_status: ReadStatus::Fresh,
@@ -103,9 +103,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let file = File::create("articles.toml")?;
-    let mut writer = std::io::BufWriter::new(file);
-    write!(writer, "{}", toml::to_string(&articles)?)?;
+    let articles = Articles { articles };
+    let toml_string = toml::ser::to_string_pretty(&articles)?;
+    println!("{toml_string}");
+    write("articles.toml", toml_string)?;
 
     Ok(())
 }
