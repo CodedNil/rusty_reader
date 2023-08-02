@@ -1,15 +1,15 @@
+use bincode::{config, Decode, Encode};
 use feed_rs::parser;
-use serde_derive::{Deserialize, Serialize};
-use std::{fs::write, io::Cursor};
+use std::io::Cursor;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Decode, Encode)]
 pub enum ReadStatus {
     Fresh,
     Saved,
     Archived,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Decode, Encode)]
 pub enum Category {
     Entertainment,
     Tech,
@@ -41,13 +41,13 @@ impl Category {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Decode, Encode)]
 pub enum ArticleType {
     Article,
     Video,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Decode, Encode)]
 struct Article {
     link: String,
     title: String,
@@ -59,15 +59,10 @@ struct Article {
     read_status: ReadStatus,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-struct Articles {
-    articles: Vec<Article>,
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
-    let mut articles = Vec::new();
+    let db = sled::open("database").unwrap();
 
     for source in rss_sources {
         let response = reqwest::get(source)
@@ -90,7 +85,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let entry_published = entry.published.unwrap_or_default();
 
-            articles.push(Article {
+            let key = entry.id.clone();
+            let article = Article {
                 link: entry.id,
                 title: entry_title,
                 category: Category::Tech,
@@ -99,14 +95,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 image: String::new(),
                 summary: entry_summary,
                 read_status: ReadStatus::Fresh,
-            });
+            };
+            let value = bincode::encode_to_vec(article, config::standard()).unwrap();
+            db.insert(key, value)?;
         }
     }
-
-    let articles = Articles { articles };
-    let toml_string = toml::ser::to_string_pretty(&articles)?;
-    println!("{toml_string}");
-    write("articles.toml", toml_string)?;
 
     Ok(())
 }
