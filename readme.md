@@ -23,3 +23,6 @@ Top portion is article/video currently selected, keybind to expand
 Navigate articles with wasd, as you move down the article selected comes to the top and previous one goes to bottom of list, cyclically
 Move sideways to save or archive
 QE to move between columns
+
+Get icon for channel from the urls favicon instead of the rss icon
+Use image-thief to get icons dominant colour, render the background of the article with that
