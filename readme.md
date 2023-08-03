@@ -26,3 +26,7 @@ QE to move between columns
 
 Get icon for channel from the urls favicon instead of the rss icon
 Use image-thief to get icons dominant colour, render the background of the article with that
+
+
+Workspaces? Have additional feeds like spam with reddit etc that you toggle on if you want to just browse for ages
+Also separate workspaces for certain topics outside of your main feeds

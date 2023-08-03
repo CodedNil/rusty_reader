@@ -2,6 +2,7 @@
 use crate::feed::Article;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use dioxus::prelude::*;
+use dioxus_fullstack::prelude::*;
 
 pub fn App(cx: Scope) -> Element {
     use_shared_state_provider(cx, Vec::<Article>::new);
@@ -14,16 +15,18 @@ pub fn App(cx: Scope) -> Element {
 }
 
 fn ArticlesList(cx: Scope) -> Element {
-    let articles = use_future(cx, (), |_| crate::feed::pull_articles()).value();
+    let articles: Option<&Result<Vec<Article>, ServerFnError>> =
+        use_future(cx, (), |_| get_server_data()).value();
 
     match articles {
-        Some(list) => render! {
+        Some(Ok(list)) => render! {
             div {
                 for article in list {
                     ArticleListing { article: article.clone() }
                 }
             }
         },
+        Some(Err(e)) => render! {format!("Error: {}", e)},
         None => render! {"Loading items"},
     }
 }
@@ -53,4 +56,9 @@ fn ArticleListing(cx: Scope, article: Article) -> Element {
             }
         }
     })
+}
+
+#[server]
+async fn get_server_data() -> Result<Vec<Article>, ServerFnError> {
+    Ok(crate::feed::get_articles())
 }

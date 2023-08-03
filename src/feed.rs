@@ -28,22 +28,19 @@ pub struct Article {
 }
 
 /// Get articles and write them to the database
-pub async fn pull_articles() -> Vec<Article> {
+pub async fn pull_articles() {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
     // http://feeds.bbci.co.uk/news/technology/rss.xml  https://hnrss.org/frontpage
-    // let db = sled::open("database").expect("Failed to open the database");
-
-    let mut articles = Vec::new();
+    let db = sled::open("database").expect("Failed to open the database");
 
     for source in rss_sources {
         match process_source(source).await {
             Ok(new_articles) => {
-                articles.extend(new_articles);
-                // for article in new_articles {
-                //     let key = article.link.clone();
-                //     let value = serde_json::to_vec(&article).unwrap();
-                //     db.insert(key, value).unwrap();
-                // }
+                for article in new_articles {
+                    let key = article.link.clone();
+                    let value = serde_json::to_vec(&article).unwrap();
+                    db.insert(key, value).unwrap();
+                }
             }
             Err(e) => {
                 eprintln!("Failed to process source {source}: {e}");
@@ -51,11 +48,9 @@ pub async fn pull_articles() -> Vec<Article> {
         }
     }
 
-    articles
-
-    // if let Err(e) = db.flush() {
-    //     eprintln!("Failed to flush the database: {e}");
-    // }
+    if let Err(e) = db.flush() {
+        eprintln!("Failed to flush the database: {e}");
+    }
 }
 
 async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error::Error>> {
