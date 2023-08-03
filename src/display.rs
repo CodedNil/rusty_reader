@@ -1,10 +1,9 @@
-#![allow(non_snake_case)]
+#![allow(non_snake_case, dead_code)]
 use crate::feed::Article;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use dioxus::prelude::*;
 use dioxus_fullstack::prelude::*;
 
-#[cfg(not(feature = "backend"))]
 pub fn App(cx: Scope) -> Element {
     use_shared_state_provider(cx, Vec::<Article>::new);
 
@@ -15,7 +14,6 @@ pub fn App(cx: Scope) -> Element {
     })
 }
 
-#[cfg(not(feature = "backend"))]
 fn ArticlesList(cx: Scope) -> Element {
     let articles: Option<&Result<Vec<Article>, ServerFnError>> =
         use_future(cx, (), |_| get_server_data()).value();

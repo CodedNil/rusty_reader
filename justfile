@@ -6,6 +6,3 @@ build:
 
 serve:
     cargo run --features ssr
-
-backend:
-    cargo run --features backend

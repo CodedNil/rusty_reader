@@ -2,17 +2,25 @@
 mod display;
 mod feed;
 
-#[cfg(not(feature = "backend"))]
 use dioxus_fullstack::launch::LaunchBuilder;
+#[cfg(feature = "ssr")]
+use tokio::runtime::Runtime;
 
-#[cfg(not(feature = "backend"))]
 fn main() {
-    LaunchBuilder::new(display::App).launch();
-}
+    #[cfg(feature = "ssr")]
+    {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1200)); // 20 minutes
+        let res = rt.block_on(async {
+            loop {
+                feed::pull_articles().await;
+                interval.tick().await;
+            }
+        });
+    }
 
-#[cfg(feature = "backend")]
-#[tokio::main]
-async fn main() {
-    println!("Pulling articles");
-    feed::pull_articles().await;
+    LaunchBuilder::new(display::App).launch();
 }
