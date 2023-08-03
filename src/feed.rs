@@ -1,6 +1,5 @@
 use atom_syndication::Feed;
 use serde::{Deserialize, Serialize};
-use sled;
 use std::io::Cursor;
 
 #[derive(Deserialize, Serialize, PartialEq, Clone)]
@@ -12,24 +11,24 @@ pub enum ReadStatus {
 
 #[derive(Deserialize, Serialize, PartialEq, Clone)]
 pub struct Channel {
-    link: String,
-    title: String,
-    icon: String,
+    pub link: String,
+    pub title: String,
+    pub icon: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Clone)]
 pub struct Article {
-    link: String,
-    channel: Channel,
-    title: String,
-    published: String,
-    image: String,
-    summary: String,
-    read_status: ReadStatus,
+    pub link: String,
+    pub channel: Channel,
+    pub title: String,
+    pub published: String,
+    pub image: String,
+    pub summary: String,
+    pub read_status: ReadStatus,
 }
 
 /// Get articles and write them to the database
-async fn get_articles() {
+pub async fn get_articles() {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
     // http://feeds.bbci.co.uk/news/technology/rss.xml  https://hnrss.org/frontpage
     let db = sled::open("database").expect("Failed to open the database");
