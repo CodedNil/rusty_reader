@@ -1,5 +1,7 @@
+#[cfg(feature = "backend")]
 use atom_syndication::Feed;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "backend")]
 use std::io::Cursor;
 
 #[derive(Deserialize, Serialize, PartialEq, Clone)]
@@ -28,6 +30,7 @@ pub struct Article {
 }
 
 /// Get articles and write them to the database
+#[cfg(feature = "backend")]
 pub async fn pull_articles() {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
     // http://feeds.bbci.co.uk/news/technology/rss.xml  https://hnrss.org/frontpage
@@ -53,6 +56,7 @@ pub async fn pull_articles() {
     }
 }
 
+#[cfg(feature = "backend")]
 async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error::Error>> {
     let response = reqwest::get(source).await?;
     let bytes = response.bytes().await?;
@@ -88,6 +92,7 @@ async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error
 }
 
 /// Get articles from the database
+#[cfg(not(feature = "backend"))]
 pub fn get_articles() -> Vec<Article> {
     let db = sled::open("database").expect("Failed to open the database");
     let mut articles = Vec::new();

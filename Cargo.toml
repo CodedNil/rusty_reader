@@ -7,6 +7,7 @@ edition = "2021"
 dioxus = "0.4.0"
 dioxus-fullstack = "0.4.1"
 axum = { version = "0.6.20", optional = true }
+tokio = { version = "1.29.1", features = ["full"], optional = true }
 reqwest = { version = "0.11.18", features = ["json"] }
 serde = { version = "1.0.180", features = ["derive"] }
 serde_json = "1.0.104"
@@ -19,3 +20,4 @@ color-thief = "0.2.2"
 default = []
 ssr = ["axum", "dioxus-fullstack/axum"]
 web = ["dioxus-fullstack/web"]
+backend = ["tokio"]

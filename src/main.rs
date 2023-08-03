@@ -1,30 +1,18 @@
-//! Run with:
-//!
-//! ```sh
-//! dx build --features web --release
-//! cargo run --features ssr --release
-//! ```
-
 #![allow(non_snake_case)]
 mod display;
 mod feed;
 
-use dioxus_fullstack::{launch::LaunchBuilder, prelude::*};
+#[cfg(not(feature = "backend"))]
+use dioxus_fullstack::launch::LaunchBuilder;
 
-#[server]
-async fn post_server_data(data: String) -> Result<(), ServerFnError> {
-    let axum::extract::Host(host): axum::extract::Host = extract().await?;
-    println!("Server received: {}", data);
-    println!("{:?}", host);
-
-    Ok(())
-}
-
-#[server]
-async fn get_server_data() -> Result<String, ServerFnError> {
-    Ok(reqwest::get("https://httpbin.org/ip").await?.text().await?)
-}
-
+#[cfg(not(feature = "backend"))]
 fn main() {
-    LaunchBuilder::new(display::App).launch()
+    LaunchBuilder::new(display::App).launch();
+}
+
+#[cfg(feature = "backend")]
+#[tokio::main]
+async fn main() {
+    println!("Pulling articles");
+    feed::pull_articles().await;
 }
