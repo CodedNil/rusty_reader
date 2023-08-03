@@ -28,19 +28,22 @@ pub struct Article {
 }
 
 /// Get articles and write them to the database
-pub async fn get_articles() {
+pub async fn pull_articles() -> Vec<Article> {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
     // http://feeds.bbci.co.uk/news/technology/rss.xml  https://hnrss.org/frontpage
-    let db = sled::open("database").expect("Failed to open the database");
+    // let db = sled::open("database").expect("Failed to open the database");
+
+    let mut articles = Vec::new();
 
     for source in rss_sources {
         match process_source(source).await {
             Ok(new_articles) => {
-                for article in new_articles {
-                    let key = article.link.clone();
-                    let value = serde_json::to_vec(&article).unwrap();
-                    db.insert(key, value).unwrap();
-                }
+                articles.extend(new_articles);
+                // for article in new_articles {
+                //     let key = article.link.clone();
+                //     let value = serde_json::to_vec(&article).unwrap();
+                //     db.insert(key, value).unwrap();
+                // }
             }
             Err(e) => {
                 eprintln!("Failed to process source {source}: {e}");
@@ -48,9 +51,11 @@ pub async fn get_articles() {
         }
     }
 
-    if let Err(e) = db.flush() {
-        eprintln!("Failed to flush the database: {e}");
-    }
+    articles
+
+    // if let Err(e) = db.flush() {
+    //     eprintln!("Failed to flush the database: {e}");
+    // }
 }
 
 async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error::Error>> {
@@ -85,4 +90,18 @@ async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error
     }
 
     Ok(articles)
+}
+
+/// Get articles from the database
+pub fn get_articles() -> Vec<Article> {
+    let db = sled::open("database").expect("Failed to open the database");
+    let mut articles = Vec::new();
+
+    for item in db.iter() {
+        let (_, v) = item.unwrap();
+        let article: Article = serde_json::from_slice(&v).unwrap();
+        articles.push(article);
+    }
+
+    articles
 }

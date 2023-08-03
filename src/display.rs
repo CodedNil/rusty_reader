@@ -2,41 +2,30 @@
 use crate::feed::Article;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use dioxus::prelude::*;
-use dioxus_fullstack::prelude::*;
 
 pub fn App(cx: Scope) -> Element {
     use_shared_state_provider(cx, Vec::<Article>::new);
 
     cx.render(rsx! {
         div { display: "flex", flex_direction: "row", width: "100%",
-            div { width: "100%", Articles {} }
+            div { width: "100%", ArticlesList {} }
         }
     })
 }
 
-fn Articles(cx: Scope) -> Element {
-    let articles = use_future(cx, (), |_| grab_articles());
+fn ArticlesList(cx: Scope) -> Element {
+    let articles = use_future(cx, (), |_| crate::feed::pull_articles()).value();
 
-    match articles.value() {
-        Some(Ok(list)) => render! {
+    match articles {
+        Some(list) => render! {
             div {
                 for article in list {
                     ArticleListing { article: article.clone() }
                 }
             }
         },
-        Some(Err(err)) => render! {"An error occurred while fetching articles {err}"},
         None => render! {"Loading items"},
     }
-}
-
-#[server]
-async fn grab_articles() -> Result<Vec<Article>, ServerFnError> {
-    // Perform some expensive computation or access a database on the server
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    let result = number * 2;
-    println!("server calculated {result}");
-    Ok(Vec::new())
 }
 
 #[inline_props]
