@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use atom_syndication::Feed;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
