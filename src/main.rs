@@ -1,5 +1,60 @@
 #![allow(non_snake_case)]
+use chrono::{DateTime, Utc};
 use dioxus::prelude::*;
+use futures::future::join_all;
+use serde::{Deserialize, Serialize};
+use std::result::Result;
+
+const BASE_API_URL: &str = "https://hacker-news.firebaseio.com/v0/";
+const ITEM_API: &str = "item/";
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StoryPageData {
+    #[serde(flatten)]
+    pub item: StoryItem,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StoryItem {
+    pub id: i64,
+    pub title: String,
+    pub url: Option<String>,
+    pub text: Option<String>,
+    #[serde(default)]
+    pub by: String,
+    #[serde(default)]
+    pub score: i64,
+    #[serde(default)]
+    pub descendants: i64,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub time: DateTime<Utc>,
+    pub r#type: String,
+}
+
+pub async fn get_story(id: i64) -> Result<StoryPageData, reqwest::Error> {
+    let url = format!("{BASE_API_URL}{ITEM_API}{id}.json");
+    let story = reqwest::get(&url).await?.json::<StoryPageData>().await?;
+    Ok(story)
+}
+
+pub async fn get_story_preview(id: i64) -> Result<StoryItem, reqwest::Error> {
+    let url = format!("{BASE_API_URL}item/{id}.json");
+    reqwest::get(&url).await?.json().await
+}
+
+pub async fn get_stories(count: usize) -> Result<Vec<StoryItem>, reqwest::Error> {
+    let url = format!("{BASE_API_URL}topstories.json");
+    let stories_ids = &reqwest::get(&url).await?.json::<Vec<i64>>().await?[..count];
+
+    let story_futures = stories_ids[..usize::min(stories_ids.len(), count)]
+        .iter()
+        .map(|&story_id| get_story_preview(story_id));
+    Ok(join_all(story_futures)
+        .await
+        .into_iter()
+        .filter_map(Result::ok)
+        .collect())
+}
 
 #[must_use]
 pub fn App(cx: Scope) -> Element {
@@ -158,63 +213,6 @@ fn Preview(cx: Scope) -> Element {
             }
         }
     }
-}
-
-// Define the Hackernews API and types
-use chrono::{DateTime, Utc};
-use futures::future::join_all;
-use serde::{Deserialize, Serialize};
-
-pub static BASE_API_URL: &str = "https://hacker-news.firebaseio.com/v0/";
-pub static ITEM_API: &str = "item/";
-pub static USER_API: &str = "user/";
-
-pub async fn get_story_preview(id: i64) -> Result<StoryItem, reqwest::Error> {
-    let url = format!("{BASE_API_URL}item/{id}.json");
-    reqwest::get(&url).await?.json().await
-}
-
-pub async fn get_stories(count: usize) -> Result<Vec<StoryItem>, reqwest::Error> {
-    let url = format!("{BASE_API_URL}topstories.json");
-    let stories_ids = &reqwest::get(&url).await?.json::<Vec<i64>>().await?[..count];
-
-    let story_futures = stories_ids[..usize::min(stories_ids.len(), count)]
-        .iter()
-        .map(|&story_id| get_story_preview(story_id));
-    Ok(join_all(story_futures)
-        .await
-        .into_iter()
-        .filter_map(std::result::Result::ok)
-        .collect())
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct StoryPageData {
-    #[serde(flatten)]
-    pub item: StoryItem,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct StoryItem {
-    pub id: i64,
-    pub title: String,
-    pub url: Option<String>,
-    pub text: Option<String>,
-    #[serde(default)]
-    pub by: String,
-    #[serde(default)]
-    pub score: i64,
-    #[serde(default)]
-    pub descendants: i64,
-    #[serde(with = "chrono::serde::ts_seconds")]
-    pub time: DateTime<Utc>,
-    pub r#type: String,
-}
-
-pub async fn get_story(id: i64) -> Result<StoryPageData, reqwest::Error> {
-    let url = format!("{BASE_API_URL}{ITEM_API}{id}.json");
-    let story = reqwest::get(&url).await?.json::<StoryPageData>().await?;
-    Ok(story)
 }
 
 fn main() {
