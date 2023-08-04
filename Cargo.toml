@@ -9,12 +9,15 @@ dioxus-fullstack = "0.4.1"
 axum = { version = "0.6.20", optional = true }
 tokio = { version = "1.29.1", optional = true }
 reqwest = { version = "0.11.18", features = ["json"] }
-serde = { version = "1.0.180", features = ["derive"] }
+serde = { version = "1.0.181", features = ["derive"] }
 serde_json = "1.0.104"
 sled = "0.34.7"
 atom_syndication = { version = "0.12.2", features = ["with-serde"] }
 chrono = { version = "0.4.26", features = ["serde"] }
 color-thief = "0.2.2"
+wasm-logger = "0.2.0"
+log = "0.4.19"
+simple_logger = "4.2.0"
 
 [features]
 default = []

@@ -3,8 +3,14 @@ mod display;
 mod feed;
 
 use dioxus_fullstack::prelude::*;
+use wasm_logger::Config;
 
 fn main() {
+    #[cfg(feature = "web")]
+    wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
+    #[cfg(feature = "ssr")]
+    simple_logger::SimpleLogger::new().init().unwrap();
+
     #[cfg(feature = "ssr")]
     {
         std::thread::spawn(|| {

@@ -7,6 +7,11 @@ Feeds are either videos or articles
 
 Summarise video transcript from youtube to make a description and a non clickbait title
 Show video thumbnail in list
+https://www.youtube.com/@GamersNexus/videos
+
+Custom rss feed creation
+https://github.com/wezm/rsspls
+https://smallformfactor.net/
 
 Articles get summarised description, and title maybe? Show images for the article too
 Ai based rejection list for article feeds, if you like a websites articles but not certain subjects you can block them
@@ -30,3 +35,5 @@ Use image-thief to get icons dominant colour, render the background of the artic
 
 Workspaces? Have additional feeds like spam with reddit etc that you toggle on if you want to just browse for ages
 Also separate workspaces for certain topics outside of your main feeds
+
+Keybind to toggle between sort by channel

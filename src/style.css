@@ -1,0 +1,67 @@
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Article Lists */
+.article-list {
+    display: flex;
+    flex-direction: column;
+    width: 25%;
+    overflow-y: scroll;
+    background: gray;
+}
+
+.article-list.center {
+    width: 100%;
+    height: 60%;
+}
+
+.article-list.saved {
+    background-color: gold;
+}
+
+.article-list.fresh {
+    background-color: green;
+}
+
+.article-list.archived {
+    background-color: red;
+}
+
+.article-preview {
+    width: 100%;
+    height: 40%;
+    background-color: blue;
+}
+
+/* Feeds */
+.feed-link {
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+    text-decoration: none;
+    width: 100%;
+}
+
+.feed-link:visited {
+    color: lightblue;
+}
+
+.feed-date {
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 0.5rem;
+    margin-left: 0.5rem;
+    text-decoration: none;
+}
+
+.feed-date:visited {
+    color: lightblue;
+}
+
+.feed-icon {
+    margin-left: 0.5rem;
+    height: 100%;
+}
