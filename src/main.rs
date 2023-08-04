@@ -2,16 +2,13 @@
 mod display;
 mod feed;
 
-use dioxus_fullstack::launch::LaunchBuilder;
+use dioxus_fullstack::prelude::*;
 
 fn main() {
     #[cfg(feature = "ssr")]
     {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
+        std::thread::spawn(|| {
+            tokio::runtime::Runtime::new().unwrap().block_on(async {
                 let mut interval = tokio::time::interval(std::time::Duration::from_secs(20 * 60));
                 loop {
                     interval.tick().await;
@@ -19,6 +16,7 @@ fn main() {
                     feed::pull_articles().await;
                 }
             });
+        });
     }
 
     LaunchBuilder::new(display::App).launch();

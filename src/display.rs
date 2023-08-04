@@ -1,28 +1,38 @@
 #![allow(non_snake_case)]
-use crate::feed::Article;
+use crate::feed::{Article, ArticleServe};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use dioxus::prelude::*;
 use dioxus_fullstack::prelude::*;
 
 pub fn App(cx: Scope) -> Element {
-    use_shared_state_provider(cx, Vec::<Article>::new);
-
-    cx.render(rsx! {
-        div { display: "flex", flex_direction: "row", width: "100%",
-            div { width: "100%", ArticlesList {} }
+    render! {
+        div { display: "flex", flex_direction: "column", width: "100%", height: "calc(100vh - 16px)",
+            div { width: "100%", height: "40%", background_color: "blue" }
+            div { width: "100%", height: "60%", overflow_y: "scroll", ArticlesLists {} }
         }
-    })
+    }
 }
 
-fn ArticlesList(cx: Scope) -> Element {
-    let articles: Option<&Result<Vec<Article>, ServerFnError>> =
-        use_future(cx, (), |_| get_server_data()).value();
+fn ArticlesLists(cx: Scope) -> Element {
+    let articles = use_future(cx, (), |_| get_server_data()).value();
 
     match articles {
         Some(Ok(list)) => render! {
-            div {
-                for article in list {
-                    ArticleListing { article: article.clone() }
+            div { display: "flex", flex_direction: "row", width: "100%",
+                div { display: "flex", flex_direction: "column", width: "100%", background_color: "gold",
+                    for article in &list.saved {
+                        ArticleListing { article: article.clone() }
+                    }
+                }
+                div { display: "flex", flex_direction: "column", width: "100%", background_color: "green",
+                    for article in &list.fresh {
+                        ArticleListing { article: article.clone() }
+                    }
+                }
+                div { display: "flex", flex_direction: "column", width: "100%", background_color: "red",
+                    for article in &list.archived {
+                        ArticleListing { article: article.clone() }
+                    }
                 }
             }
         },
@@ -59,6 +69,6 @@ fn ArticleListing(cx: Scope, article: Article) -> Element {
 }
 
 #[server]
-async fn get_server_data() -> Result<Vec<Article>, ServerFnError> {
+async fn get_server_data() -> Result<ArticleServe, ServerFnError> {
     Ok(crate::feed::get_articles())
 }

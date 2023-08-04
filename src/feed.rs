@@ -27,6 +27,13 @@ pub struct Article {
     pub read_status: ReadStatus,
 }
 
+#[derive(Deserialize, Serialize, PartialEq, Clone)]
+pub struct ArticleServe {
+    pub fresh: Vec<Article>,
+    pub saved: Vec<Article>,
+    pub archived: Vec<Article>,
+}
+
 /// Get articles and write them to the database
 pub async fn pull_articles() {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
@@ -88,14 +95,23 @@ async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error
 }
 
 /// Get articles from the database
-pub fn get_articles() -> Vec<Article> {
+pub fn get_articles() -> ArticleServe {
+    println!("Getting articles from database");
     let db = sled::open("database").expect("Failed to open the database");
-    let mut articles = Vec::new();
+    let mut articles = ArticleServe {
+        fresh: Vec::new(),
+        saved: Vec::new(),
+        archived: Vec::new(),
+    };
 
     for item in db.iter() {
         let (_, v) = item.unwrap();
         let article: Article = serde_json::from_slice(&v).unwrap();
-        articles.push(article);
+        match article.read_status {
+            ReadStatus::Fresh => articles.fresh.push(article),
+            ReadStatus::Saved => articles.saved.push(article),
+            ReadStatus::Archived => articles.archived.push(article),
+        }
     }
 
     articles
