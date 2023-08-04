@@ -17,25 +17,39 @@ pub fn App(cx: Scope) -> Element {
         articles_archived = list.archived.clone();
     }
 
+    // Print articles fresh and print if client or server
+    println!("Articles fresh: {:?}", articles_fresh);
+    if cfg!(feature = "ssr") {
+        println!("SSR");
+    } else {
+        println!("Client");
+    }
+
     render! {
         style { include_str!("../src/style.css") }
-        div { display: "flex", flex_direction: "row", width: "100%", height: "100vh",
-            div { class: "article-list left saved",
-                for article in &articles_saved {
-                    ArticleListing { article: article.clone() }
-                }
-            }
-            div { display: "flex", flex_direction: "column", width: "50%", height: "100vh",
-                div { class: "article-preview" }
-                div { class: "article-list center fresh",
-                    for article in &articles_fresh {
+        div { class: "main_content",
+            div { class: "articlebox left saved",
+                div { class: "articlebox-column",
+                    for article in &articles_saved {
                         ArticleListing { article: article.clone() }
                     }
                 }
             }
-            div { class: "article-list right archived",
-                for article in &articles_archived {
-                    ArticleListing { article: article.clone() }
+            div { class: "center_content",
+                div { class: "articlebox preview" }
+                div { class: "articlebox center fresh",
+                    div { class: "articlebox-column",
+                        for article in &articles_fresh {
+                            ArticleListing { article: article.clone() }
+                        }
+                    }
+                }
+            }
+            div { class: "articlebox right archived",
+                div { class: "articlebox-column",
+                    for article in &articles_archived {
+                        ArticleListing { article: article.clone() }
+                    }
                 }
             }
         }

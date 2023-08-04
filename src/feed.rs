@@ -2,21 +2,21 @@ use atom_syndication::Feed;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 
-#[derive(Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub enum ReadStatus {
     Fresh,
     Saved,
     Archived,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct Channel {
     pub link: String,
     pub title: String,
     pub icon: String,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct Article {
     pub link: String,
     pub channel: Channel,
@@ -27,7 +27,7 @@ pub struct Article {
     pub read_status: ReadStatus,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct ArticleServe {
     pub fresh: Vec<Article>,
     pub saved: Vec<Article>,
