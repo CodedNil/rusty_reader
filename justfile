@@ -3,11 +3,11 @@ alias r := run
 alias rd := rundebug
 
 build:
-    tsc assets/main.ts
+    tsc src/main.ts --outDir assets
     cargo build
 
 run:
-    tsc assets/main.ts
+    tsc src/main.ts --outDir assets
     cargo run
 
 rundebug:
