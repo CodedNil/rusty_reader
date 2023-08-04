@@ -1,14 +1,13 @@
-# use PowerShell instead of sh:
-set shell := ["powershell.exe", "-c"]
-
 alias b := build
 alias r := run
 alias rd := rundebug
 
 build:
+    tsc assets/main.ts
     cargo build
 
 run:
+    tsc assets/main.ts
     cargo run
 
 rundebug:
