@@ -4,22 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-dioxus = "0.4.0"
-dioxus-fullstack = "0.4.1"
-axum = { version = "0.6.20", optional = true }
-tokio = { version = "1.29.1", optional = true }
+axum = "0.6.20"
+axum-extra = "0.7.7"
+tokio = { version = "1.0", features = ["full"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.4.0", features = ["fs"] }
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# RSS feed
 reqwest = { version = "0.11.18", features = ["json"] }
-serde = { version = "1.0.181", features = ["derive"] }
-serde_json = "1.0.104"
 sled = "0.34.7"
 atom_syndication = { version = "0.12.2", features = ["with-serde"] }
 chrono = { version = "0.4.26", features = ["serde"] }
 color-thief = "0.2.2"
-wasm-logger = "0.2.0"
-log = "0.4.19"
-simple_logger = "4.2.0"
-
-[features]
-default = []
-ssr = ["axum", "dioxus-fullstack/axum", "tokio"]
-web = ["dioxus-fullstack/web"]

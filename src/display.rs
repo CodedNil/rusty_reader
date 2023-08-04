@@ -5,27 +5,19 @@ use dioxus::prelude::*;
 use dioxus_fullstack::prelude::*;
 
 pub fn App(cx: Scope) -> Element {
-    let articles = use_future(cx, (), |_| get_server_data()).value();
+    let articles = use_future(cx, (), |_| async { get_server_data().await });
 
     // Split out articles into their respective categories
     let mut articles_fresh = Vec::new();
     let mut articles_saved = Vec::new();
     let mut articles_archived = Vec::new();
-    if let Some(Ok(list)) = &articles {
+    if let Some(Ok(list)) = &articles.value() {
         articles_fresh = list.fresh.clone();
         articles_saved = list.saved.clone();
         articles_archived = list.archived.clone();
     }
 
-    // Print articles fresh and print if client or server
-    println!("Articles fresh: {:?}", articles_fresh);
-    if cfg!(feature = "ssr") {
-        println!("SSR");
-    } else {
-        println!("Client");
-    }
-
-    render! {
+    cx.render(rsx! {
         style { include_str!("../src/style.css") }
         div { class: "main_content",
             div { class: "articlebox left saved",
@@ -53,7 +45,7 @@ pub fn App(cx: Scope) -> Element {
                 }
             }
         }
-    }
+    })
 }
 
 #[inline_props]

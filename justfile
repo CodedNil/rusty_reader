@@ -2,13 +2,14 @@
 set shell := ["powershell.exe", "-c"]
 
 alias b := build
-alias s := serve
-alias bs := build-serve
+alias r := run
+alias rd := rundebug
 
 build:
-    dx build --features web
+    cargo build
 
-serve:
-    cargo run --features ssr
+run:
+    cargo run
 
-build-serve: build serve
+rundebug:
+    @$env:RUST_LOG="debug"; cargo run

@@ -1,29 +1,36 @@
-#![allow(non_snake_case)]
-mod display;
 mod feed;
 
-use dioxus_fullstack::prelude::*;
-use wasm_logger::Config;
+use std::net::SocketAddr;
 
-fn main() {
-    #[cfg(feature = "web")]
-    wasm_logger::init(wasm_logger::Config::new(log::Level::Debug));
-    // #[cfg(feature = "ssr")]
-    // simple_logger::SimpleLogger::new().init().unwrap();
+use axum::Router;
+use tokio::time::{interval, Duration};
+use tower_http::services::ServeDir;
 
-    #[cfg(feature = "ssr")]
-    {
-        std::thread::spawn(|| {
-            tokio::runtime::Runtime::new().unwrap().block_on(async {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(20 * 60));
-                loop {
-                    interval.tick().await;
-                    println!("Pulling articles");
-                    feed::pull_articles().await;
-                }
-            });
-        });
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt::init();
+
+    let app = Router::new().nest_service("/", ServeDir::new("assets"));
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    println!("Listening on {addr}");
+    let server = axum::Server::bind(&addr).serve(app.into_make_service());
+
+    let article_puller = async {
+        let mut interval = interval(Duration::from_secs(20 * 60));
+        loop {
+            interval.tick().await;
+            println!("Pulling articles");
+            feed::pull_articles().await;
+        }
+    };
+
+    tokio::select! {
+        _ = server => {
+            eprintln!("Server exited.");
+        }
+        _ = article_puller => {
+            eprintln!("Article puller exited.");
+        }
     }
-
-    LaunchBuilder::new(display::App).launch();
 }
