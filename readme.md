@@ -14,6 +14,8 @@ Frontend editor for subscribed channels, with import and export opml
 
 Offline reading
 
+Press enter to open article in new tab
+
 Backend todo:
 Summarise video transcript from youtube to make a description and a non clickbait title
 Show video thumbnail in list
@@ -27,5 +29,4 @@ Articles get summarised description, and title maybe? Show images for the articl
 
 Page background wallpaper ai driven, base on time of day, weather etc make a prompt for midjouney
 
-Get icon for channel from the urls favicon instead of the rss icon
 Use image-thief to get icons dominant colour, render the background of the article with that

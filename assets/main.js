@@ -89,6 +89,8 @@ const highlightCurrentArticle = () => {
     const articles = columns[currentColumn].getElementsByClassName("article");
     if (articles.length > currentArticle[currentColumn]) {
         articles[currentArticle[currentColumn]].classList.add("selected");
+        // Setup preview
+        setupPreview(articles[currentArticle[currentColumn]]);
     }
     columns[currentColumn].classList.add("selected");
     columns[currentColumn].parentElement.classList.add("selected");
@@ -105,6 +107,17 @@ const highlightCurrentArticle = () => {
         }
         articles[i].style.order = newIndex;
     }
+};
+
+const setupPreview = (articleElement) => {
+    const preview = document.getElementById("articlebox-preview");
+    const header = document.getElementById("preview-header");
+    const date = document.getElementById("preview-date");
+    const text = document.getElementById("preview-text");
+
+    header.innerHTML = articleElement.data.title;
+    date.innerHTML = articleElement.data.published.toDateString();
+    text.innerHTML = articleElement.data.summary;
 };
 
 const undoStack = [];

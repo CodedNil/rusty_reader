@@ -57,12 +57,32 @@ body {
 
 #articlebox-center {
     width: 100%;
-    height: 60%;
 }
+
+/* Preview */
 
 #articlebox-preview {
     width: 100%;
-    height: 40%;
+    color: white;
+    font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-align: center;
+    overflow: visible;
+}
+
+#preview-header {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 4px 0 0 0;
+}
+
+#preview-date {
+    font-size: 12px;
+    margin: 0;
+}
+
+#preview-text {
+    font-size: 10px;
+    margin: 10px 0;
 }
 
 /* Articles */
@@ -74,6 +94,8 @@ body {
     border-radius: 2px;
     border: 4px solid rgba(255, 255, 255, 0);
     box-sizing: border-box;
+    color: white;
+    font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 .article.selected {
@@ -98,14 +120,13 @@ body {
 }
 
 .article-link {
-    color: white;
-    font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-weight: 600;
     font-size: 14px;
     text-decoration: none;
     width: 100%;
     height: 40px;
     overflow: hidden;
+    color: white;
 }
 
 .article-link:visited {
@@ -113,13 +134,10 @@ body {
 }
 
 .article-date {
-    color: white;
-    font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 11px;
     margin-left: 12px;
     margin-right: 6px;
     white-space: nowrap;
-    text-decoration: none;
 }
 
 .article-icon {

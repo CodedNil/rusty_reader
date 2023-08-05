@@ -3,6 +3,8 @@ use axum::{
     extract::Path,
     response::{IntoResponse, Json},
 };
+use readability::extractor;
+use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{io::Cursor, str::FromStr};
@@ -74,6 +76,51 @@ pub async fn pull_articles() {
     }
 }
 
+#[derive(Debug)]
+pub struct WebpageData {
+    favicon: Option<String>,
+    image: Option<String>,
+    main_content: Option<String>,
+}
+
+/// Website scraping for data
+pub async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Error>> {
+    // Download the webpage
+    let resp = reqwest::get(url).await?;
+    let body = resp.text().await?;
+
+    // Parse the HTML
+    let document = Html::parse_document(&body);
+
+    // Get the favicon
+    let favicon_selector = Selector::parse("link[rel=\"shortcut icon\"]").unwrap();
+    let favicon = document
+        .select(&favicon_selector)
+        .next()
+        .and_then(|element| element.value().attr("href"))
+        .and_then(|relative_url| url::Url::parse(url).ok()?.join(relative_url).ok())
+        .map(|url| url.to_string());
+
+    // Get the first image
+    let image_selector = Selector::parse("img").unwrap();
+    let image = document
+        .select(&image_selector)
+        .next()
+        .and_then(|element| element.value().attr("src"))
+        .map(String::from);
+
+    // Get the main content using the readability crate
+    let url = url::Url::parse(url)?;
+    let mut body_cursor = Cursor::new(body);
+    let main_content = extractor::extract(&mut body_cursor, &url)?;
+
+    Ok(WebpageData {
+        favicon,
+        image,
+        main_content: Some(main_content.content),
+    })
+}
+
 async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error::Error>> {
     let response = reqwest::get(source).await?;
     let bytes = response.bytes().await?;
@@ -82,24 +129,29 @@ async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error
 
     let mut articles = Vec::new();
 
-    let channel = Channel {
-        link: feed.id,
-        title: feed.title.value,
-        icon: feed.icon.unwrap_or_default(),
-    };
-
     for entry in feed.entries {
         let entry_title = entry.title.value;
         let entry_summary = entry.summary.map_or_else(String::new, |s| s.value);
         let entry_published = entry.published.unwrap_or_default();
 
+        // Download the webpage and extract the image
+        let data = scrape_website(&entry.id.clone()).await?;
+
+        let channel = Channel {
+            link: feed.id.clone(),
+            title: feed.title.value.clone(),
+            icon: data
+                .favicon
+                .unwrap_or(feed.icon.clone().unwrap_or_default()),
+        };
+
         let article = Article {
             link: entry.id,
-            channel: channel.clone(),
+            channel,
             title: entry_title,
             published: entry_published.to_string(),
-            image: String::new(),
-            summary: entry_summary,
+            image: data.image.unwrap_or_default(),
+            summary: data.main_content.unwrap_or(entry_summary),
             read_status: ReadStatus::Fresh,
         };
         articles.push(article);
