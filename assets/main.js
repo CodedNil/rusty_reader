@@ -1,17 +1,37 @@
+const Column = {
+    FRESH: "Fresh",
+    SAVED: "Saved",
+    ARCHIVED: "Archived",
+};
+
+let currentColumn = Column.FRESH;
+let currentArticle = {
+    [Column.FRESH]: 0,
+    [Column.SAVED]: 0,
+    [Column.ARCHIVED]: 0,
+};
+
+const columns = {
+    [Column.FRESH]: null,
+    [Column.SAVED]: null,
+    [Column.ARCHIVED]: null,
+};
+
 const fetchArticles = async () => {
     try {
         const response = await fetch("/articles");
         const data = await response.json();
 
-        const articlesLeft = document.getElementById("articles-left");
-        const articlesCenter = document.getElementById("articles-center");
-        const articlesRight = document.getElementById("articles-right");
+        columns[Column.FRESH] = document.getElementById("articles-center");
+        columns[Column.SAVED] = document.getElementById("articles-left");
+        columns[Column.ARCHIVED] = document.getElementById("articles-right");
 
-        if (!articlesCenter || !articlesLeft || !articlesRight) {
-            throw new Error(
-                "One or more elements (articles-center, articles-left, articles-right) not found"
-            );
-        }
+        // Sort articles by recent first
+        data.sort(
+            (a, b) =>
+                new Date(b.published.replace(" ", "T").replace(" ", "")) -
+                new Date(a.published.replace(" ", "T").replace(" ", ""))
+        );
 
         for (const article of data) {
             const articleElement = document.createElement("div");
@@ -24,18 +44,140 @@ const fetchArticles = async () => {
             `;
             articleElement.classList.add("article");
 
-            if (article.read_status === "Fresh") {
-                articlesCenter.appendChild(articleElement);
-            } else if (article.read_status === "Saved") {
-                articlesLeft.appendChild(articleElement);
-            } else if (article.read_status === "Archived") {
-                articlesRight.appendChild(articleElement);
+            if (article.read_status === Column.FRESH) {
+                columns[Column.FRESH].appendChild(articleElement);
+            } else if (article.read_status === Column.SAVED) {
+                columns[Column.SAVED].appendChild(articleElement);
+            } else if (article.read_status === Column.ARCHIVED) {
+                columns[Column.ARCHIVED].appendChild(articleElement);
             }
         }
+
+        highlightCurrentArticle();
     } catch (error) {
         console.error(error);
     }
 };
+
+const highlightCurrentArticle = () => {
+    // Remove the 'selected' and 'first' class from all articles
+    document.querySelectorAll(".article").forEach((el) => {
+        el.classList.remove("selected");
+        el.classList.remove("first");
+    });
+
+    // Add the 'selected' class to the current article in the current column
+    const articles = columns[currentColumn].getElementsByClassName("article");
+    if (articles.length > currentArticle[currentColumn]) {
+        articles[currentArticle[currentColumn]].classList.add("selected");
+    }
+
+    // Reorder the articles in the current column
+    const selectedArticleIndex = currentArticle[currentColumn] - 1;
+    for (let i = 0; i < articles.length; i++) {
+        let newIndex = i - selectedArticleIndex;
+        if (i < selectedArticleIndex) {
+            newIndex = articles.length - selectedArticleIndex + i;
+        }
+        if (newIndex >= articles.length) {
+            newIndex = i - articles.length;
+        }
+        articles[i].style.order = newIndex;
+    }
+
+    // // Add first class to first article to give it margin
+    // if (articles.length > 1) {
+    //     if (currentArticle[currentColumn] === 1) {
+    //         articles[0].classList.remove("first");
+    //     } else {
+    //         articles[0].classList.add("first");
+    //     }
+    // }
+};
+
+document.addEventListener("keydown", async (event) => {
+    const articles = columns[currentColumn].getElementsByClassName("article");
+    let articleToMove;
+
+    switch (event.key) {
+        case "q":
+            // Change current column to the previous one
+            currentColumn =
+                currentColumn === Column.FRESH
+                    ? Column.SAVED
+                    : currentColumn === Column.SAVED
+                    ? Column.ARCHIVED
+                    : Column.FRESH;
+            break;
+        case "e":
+            // Change current column to the next one
+            currentColumn =
+                currentColumn === Column.FRESH
+                    ? Column.ARCHIVED
+                    : currentColumn === Column.SAVED
+                    ? Column.FRESH
+                    : Column.SAVED;
+            break;
+        case "w":
+            // Change current article to the previous one in the current column, cyclical
+            currentArticle[currentColumn] =
+                (currentArticle[currentColumn] - 1 + articles.length) %
+                articles.length;
+            break;
+        case "s":
+            // Change current article to the next one in the current column, cyclical
+            currentArticle[currentColumn] =
+                (currentArticle[currentColumn] + 1) % articles.length;
+            break;
+        case "a":
+            // If current column has articles
+            if (columns[currentColumn].childElementCount !== 0) {
+                // Move the current article to the previous column in a cyclical manner
+                articleToMove = articles[currentArticle[currentColumn]];
+                if (currentColumn === Column.FRESH) {
+                    columns[Column.SAVED].appendChild(articleToMove);
+                } else if (currentColumn === Column.SAVED) {
+                    columns[Column.ARCHIVED].appendChild(articleToMove);
+                } else if (currentColumn === Column.ARCHIVED) {
+                    columns[Column.FRESH].appendChild(articleToMove);
+                }
+            }
+            break;
+        case "d":
+            // If current column has articles
+            if (columns[currentColumn].childElementCount !== 0) {
+                // Move the current article to the next column in a cyclical manner
+                articleToMove = articles[currentArticle[currentColumn]];
+                if (currentColumn === Column.FRESH) {
+                    columns[Column.ARCHIVED].appendChild(articleToMove);
+                } else if (currentColumn === Column.SAVED) {
+                    columns[Column.FRESH].appendChild(articleToMove);
+                } else if (currentColumn === Column.ARCHIVED) {
+                    columns[Column.SAVED].appendChild(articleToMove);
+                }
+            }
+            break;
+    }
+
+    // Clamp the current article to the bounds of the current column
+    if (currentArticle[currentColumn] > articles.length - 1) {
+        currentArticle[currentColumn] = 0;
+    }
+
+    // Highlight the current article
+    highlightCurrentArticle();
+
+    // // Send a PUT request to the server to update the article's status
+    // if (articleToMove) {
+    //     await fetch(`/articles/${articleToMove.id}`, {
+    //         method: "PUT",
+    //         headers: {
+    //             "Content-Type": "application/json",
+    //         },
+    //         body: JSON.stringify({ read_status: currentColumn }),
+    //     });
+    // }
+});
 
 fetchArticles();
 
