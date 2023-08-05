@@ -108,7 +108,7 @@ async fn pull_articles(db: Arc<Db>) {
                 continue;
             }
         };
-        match process_source(source, db.clone()).await {
+        match process_source(source, channel_data, db.clone()).await {
             Ok(_) => {}
             Err(e) => eprintln!("Error processing source {source}: {e}"),
         }
@@ -117,10 +117,8 @@ async fn pull_articles(db: Arc<Db>) {
 
 #[derive(Debug)]
 struct WebpageData {
-    favicon: Option<String>,
     image: Option<String>,
     main_content: Option<String>,
-    palette: Option<Vec<String>>,
 }
 
 /// Website scraping for data
@@ -129,44 +127,6 @@ async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Er
     let resp = reqwest::get(url).await?;
     let body = resp.text().await?;
     let document = Html::parse_document(&body);
-
-    // Get the favicon
-    let favicon = if let Ok(favicon_selector) = Selector::parse("link[rel=\"shortcut icon\"]") {
-        document
-            .select(&favicon_selector)
-            .next()
-            .and_then(|element| element.value().attr("href"))
-            .and_then(|relative_url| url::Url::parse(url).ok()?.join(relative_url).ok())
-            .map(|url| url.to_string())
-    } else {
-        None
-    };
-
-    // Get the favicon image and extract the color palette
-    let palette = if let Some(favicon_url) = &favicon {
-        if let Ok(resp) = reqwest::get(favicon_url).await {
-            if let Ok(bytes) = resp.bytes().await {
-                if let Ok(colors) =
-                    color_thief::get_palette(&bytes, color_thief::ColorFormat::Rgb, 10, 10)
-                {
-                    Some(
-                        colors
-                            .into_iter()
-                            .map(|color| format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b))
-                            .collect(),
-                    )
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
 
     // Get the first image
     let image = if let Ok(image_selector) = Selector::parse("img") {
@@ -190,14 +150,16 @@ async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Er
     };
 
     Ok(WebpageData {
-        favicon,
         image,
         main_content,
-        palette,
     })
 }
 
-async fn process_source(source: &str, db: Arc<Db>) -> Result<(), Box<dyn std::error::Error>> {
+async fn process_source(
+    source: &str,
+    channel: channel::Channel,
+    db: Arc<Db>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let response = reqwest::get(source).await?;
     let bytes = response.bytes().await?;
     let cursor = Cursor::new(bytes);
@@ -220,16 +182,9 @@ async fn process_source(source: &str, db: Arc<Db>) -> Result<(), Box<dyn std::er
 
         // Download the webpage and extract the image
         if let Ok(data) = scrape_website(&entry_link.clone()).await {
-            let channel = channel::Channel {
-                link: feed.id.clone(),
-                title: feed.title.clone().unwrap().content.clone(),
-                icon: data.favicon.unwrap_or_default(),
-                palette: data.palette.unwrap_or_default(),
-            };
-
             let article = Article {
                 link: entry_link,
-                channel,
+                channel: channel.clone(),
                 title: entry_title,
                 published: entry_published.to_rfc3339(),
                 image: data.image.unwrap_or_default(),
