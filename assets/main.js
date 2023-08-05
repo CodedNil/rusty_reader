@@ -4,8 +4,8 @@ const Column = {
     ARCHIVED: "Archived",
 };
 
-let currentColumn = Column.FRESH;
-let currentArticle = {
+let currentColumn = localStorage.getItem("currentColumn") || Column.FRESH;
+let currentArticle = JSON.parse(localStorage.getItem("currentArticle")) || {
     [Column.FRESH]: 0,
     [Column.SAVED]: 0,
     [Column.ARCHIVED]: 0,
@@ -21,17 +21,18 @@ const fetchArticles = async () => {
     try {
         const response = await fetch("/articles");
         const data = await response.json();
+        for (const article of data) {
+            article.published = new Date(
+                article.published.replace(" ", "T").replace(" ", "")
+            );
+        }
 
         columns[Column.FRESH] = document.getElementById("articles-center");
         columns[Column.SAVED] = document.getElementById("articles-left");
         columns[Column.ARCHIVED] = document.getElementById("articles-right");
 
         // Sort articles by recent first
-        data.sort(
-            (a, b) =>
-                new Date(b.published.replace(" ", "T").replace(" ", "")) -
-                new Date(a.published.replace(" ", "T").replace(" ", ""))
-        );
+        data.sort((a, b) => b.published - a.published);
 
         for (const article of data) {
             const articleElement = document.createElement("div");
@@ -43,6 +44,7 @@ const fetchArticles = async () => {
                 <img class="article-icon" src="${article.channel.icon}">
             `;
             articleElement.classList.add("article");
+            articleElement.data = article;
 
             if (article.read_status === Column.FRESH) {
                 columns[Column.FRESH].appendChild(articleElement);
@@ -53,6 +55,19 @@ const fetchArticles = async () => {
             }
         }
 
+        // Ensure currentArticle is within bounds for each column
+        for (const column in currentArticle) {
+            if (currentArticle.hasOwnProperty(column)) {
+                const articles =
+                    columns[column].getElementsByClassName("article");
+                if (currentArticle[column] >= articles.length) {
+                    currentArticle[column] = 0;
+                }
+            }
+        }
+        // Save the possibly updated currentArticle back to localStorage
+        localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
+
         highlightCurrentArticle();
     } catch (error) {
         console.error(error);
@@ -60,17 +75,23 @@ const fetchArticles = async () => {
 };
 
 const highlightCurrentArticle = () => {
-    // Remove the 'selected' and 'first' class from all articles
+    // Remove the 'selected' and 'first' class from all articles and boxes
     document.querySelectorAll(".article").forEach((el) => {
         el.classList.remove("selected");
         el.classList.remove("first");
     });
+    document.querySelectorAll(".articlebox-column").forEach((el) => {
+        el.classList.remove("selected");
+        el.parentElement.classList.remove("selected");
+    });
 
-    // Add the 'selected' class to the current article in the current column
+    // Add the 'selected' class to the current article in the current column and to the column
     const articles = columns[currentColumn].getElementsByClassName("article");
     if (articles.length > currentArticle[currentColumn]) {
         articles[currentArticle[currentColumn]].classList.add("selected");
     }
+    columns[currentColumn].classList.add("selected");
+    columns[currentColumn].parentElement.classList.add("selected");
 
     // Reorder the articles in the current column
     const selectedArticleIndex = currentArticle[currentColumn] - 1;
@@ -84,15 +105,31 @@ const highlightCurrentArticle = () => {
         }
         articles[i].style.order = newIndex;
     }
+};
 
-    // // Add first class to first article to give it margin
-    // if (articles.length > 1) {
-    //     if (currentArticle[currentColumn] === 1) {
-    //         articles[0].classList.remove("first");
-    //     } else {
-    //         articles[0].classList.add("first");
-    //     }
-    // }
+const undoStack = [];
+const redoStack = [];
+
+const moveArticle = (article, fromColumn, toColumn) => {
+    toColumn.appendChild(article);
+    undoStack.push({ article, fromColumn, toColumn });
+    redoStack.length = 0; // Clear the redo stack whenever a new move is made
+    if (undoStack.length > 10) {
+        undoStack.shift();
+    }
+
+    // Keep the current article in bounds
+    if (
+        currentArticle[currentColumn] >=
+        columns[currentColumn].childElementCount
+    ) {
+        currentArticle[currentColumn] = 0;
+    }
+
+    // Sort the articles in the destination column by date
+    Array.from(toColumn.children)
+        .sort((a, b) => b.data.published - a.data.published)
+        .forEach((articleElement) => toColumn.appendChild(articleElement));
 };
 
 document.addEventListener("keydown", async (event) => {
@@ -108,6 +145,7 @@ document.addEventListener("keydown", async (event) => {
                     : currentColumn === Column.SAVED
                     ? Column.ARCHIVED
                     : Column.FRESH;
+            localStorage.setItem("currentColumn", currentColumn);
             break;
         case "e":
             // Change current column to the next one
@@ -117,66 +155,76 @@ document.addEventListener("keydown", async (event) => {
                     : currentColumn === Column.SAVED
                     ? Column.FRESH
                     : Column.SAVED;
+            localStorage.setItem("currentColumn", currentColumn);
             break;
         case "w":
             // Change current article to the previous one in the current column, cyclical
             currentArticle[currentColumn] =
                 (currentArticle[currentColumn] - 1 + articles.length) %
                 articles.length;
+            localStorage.setItem(
+                "currentArticle",
+                JSON.stringify(currentArticle)
+            );
             break;
         case "s":
             // Change current article to the next one in the current column, cyclical
             currentArticle[currentColumn] =
                 (currentArticle[currentColumn] + 1) % articles.length;
+            localStorage.setItem(
+                "currentArticle",
+                JSON.stringify(currentArticle)
+            );
             break;
         case "a":
-            // If current column has articles
             if (columns[currentColumn].childElementCount !== 0) {
-                // Move the current article to the previous column in a cyclical manner
                 articleToMove = articles[currentArticle[currentColumn]];
-                if (currentColumn === Column.FRESH) {
-                    columns[Column.SAVED].appendChild(articleToMove);
-                } else if (currentColumn === Column.SAVED) {
-                    columns[Column.ARCHIVED].appendChild(articleToMove);
-                } else if (currentColumn === Column.ARCHIVED) {
-                    columns[Column.FRESH].appendChild(articleToMove);
-                }
+                const toColumn =
+                    currentColumn === Column.FRESH
+                        ? columns[Column.SAVED]
+                        : currentColumn === Column.SAVED
+                        ? columns[Column.ARCHIVED]
+                        : columns[Column.FRESH];
+                moveArticle(articleToMove, columns[currentColumn], toColumn);
             }
             break;
         case "d":
-            // If current column has articles
             if (columns[currentColumn].childElementCount !== 0) {
-                // Move the current article to the next column in a cyclical manner
                 articleToMove = articles[currentArticle[currentColumn]];
-                if (currentColumn === Column.FRESH) {
-                    columns[Column.ARCHIVED].appendChild(articleToMove);
-                } else if (currentColumn === Column.SAVED) {
-                    columns[Column.FRESH].appendChild(articleToMove);
-                } else if (currentColumn === Column.ARCHIVED) {
-                    columns[Column.SAVED].appendChild(articleToMove);
-                }
+                const toColumn =
+                    currentColumn === Column.FRESH
+                        ? columns[Column.ARCHIVED]
+                        : currentColumn === Column.SAVED
+                        ? columns[Column.FRESH]
+                        : columns[Column.SAVED];
+                moveArticle(articleToMove, columns[currentColumn], toColumn);
+            }
+            break;
+        case "z":
+            if (event.ctrlKey && undoStack.length > 0) {
+                const { article, fromColumn, toColumn } = undoStack.pop();
+                redoStack.push({
+                    article,
+                    fromColumn: toColumn,
+                    toColumn: fromColumn,
+                });
+                fromColumn.appendChild(article);
+            }
+            break;
+        case "Z":
+            if (event.ctrlKey && event.shiftKey && redoStack.length > 0) {
+                const { article, fromColumn, toColumn } = redoStack.pop();
+                undoStack.push({
+                    article,
+                    fromColumn: toColumn,
+                    toColumn: fromColumn,
+                });
+                fromColumn.appendChild(article);
             }
             break;
     }
 
-    // Clamp the current article to the bounds of the current column
-    if (currentArticle[currentColumn] > articles.length - 1) {
-        currentArticle[currentColumn] = 0;
-    }
-
-    // Highlight the current article
     highlightCurrentArticle();
-
-    // // Send a PUT request to the server to update the article's status
-    // if (articleToMove) {
-    //     await fetch(`/articles/${articleToMove.id}`, {
-    //         method: "PUT",
-    //         headers: {
-    //             "Content-Type": "application/json",
-    //         },
-    //         body: JSON.stringify({ read_status: currentColumn }),
-    //     });
-    // }
 });
 
 fetchArticles();
@@ -193,12 +241,9 @@ fetchArticles();
 // - Months with 1 decimal place if under a year
 // - Year with 1 decimal place after that
 function format_time_ago(published) {
-    published = published.replace(" ", "T").replace(" ", "");
-    let publishedDate = new Date(published);
-
     // Calculate the duration between the current time and the published date
     let duration = Math.floor(
-        (new Date().getTime() - publishedDate.getTime()) / 1000
+        (new Date().getTime() - published.getTime()) / 1000
     );
 
     // Depending on the duration, format it in different ways

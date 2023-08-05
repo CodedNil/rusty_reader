@@ -37,6 +37,10 @@ body {
     box-sizing: border-box;
 }
 
+.articlebox.selected {
+    background-color: rgba(61, 66, 75, 0.8);
+}
+
 .articlebox-column {
     height: 100%;
     display: flex;
@@ -45,6 +49,10 @@ body {
     gap: 4px;
     border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.articlebox-column.selected {
+    border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 #articlebox-center {
