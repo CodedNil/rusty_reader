@@ -29,13 +29,6 @@ pub struct Article {
     pub read_status: ReadStatus,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
-pub struct ArticleServe {
-    pub fresh: Vec<Article>,
-    pub saved: Vec<Article>,
-    pub archived: Vec<Article>,
-}
-
 /// Get articles and write them to the database
 pub async fn pull_articles() {
     let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
@@ -100,21 +93,10 @@ async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error
 #[allow(clippy::unused_async)]
 pub async fn get_articles() -> Json<Value> {
     let db = sled::open("database").expect("Failed to open the database");
-    let mut articles = ArticleServe {
-        fresh: Vec::new(),
-        saved: Vec::new(),
-        archived: Vec::new(),
-    };
-
-    for item in db.iter() {
-        let (_, v) = item.unwrap();
-        let article: Article = serde_json::from_slice(&v).unwrap();
-        match article.read_status {
-            ReadStatus::Fresh => articles.fresh.push(article),
-            ReadStatus::Saved => articles.saved.push(article),
-            ReadStatus::Archived => articles.archived.push(article),
-        }
-    }
+    let articles: Vec<Article> = db
+        .iter()
+        .map(|item| serde_json::from_slice(&item.unwrap().1).unwrap())
+        .collect();
 
     Json(json!(articles))
 }
