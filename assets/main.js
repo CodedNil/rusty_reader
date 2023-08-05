@@ -94,7 +94,7 @@ const highlightCurrentArticle = () => {
     columns[currentColumn].parentElement.classList.add("selected");
 
     // Reorder the articles in the current column
-    const selectedArticleIndex = currentArticle[currentColumn] - 1;
+    const selectedArticleIndex = currentArticle[currentColumn];
     for (let i = 0; i < articles.length; i++) {
         let newIndex = i - selectedArticleIndex;
         if (i < selectedArticleIndex) {
@@ -110,7 +110,10 @@ const highlightCurrentArticle = () => {
 const undoStack = [];
 const redoStack = [];
 
-const moveArticle = (article, fromColumn, toColumn) => {
+const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
+    const fromColumn = columns[fromColumnStatus];
+    const toColumn = columns[toColumnStatus];
+
     toColumn.appendChild(article);
     undoStack.push({ article, fromColumn, toColumn });
     redoStack.length = 0; // Clear the redo stack whenever a new move is made
@@ -130,6 +133,12 @@ const moveArticle = (article, fromColumn, toColumn) => {
     Array.from(toColumn.children)
         .sort((a, b) => b.data.published - a.data.published)
         .forEach((articleElement) => toColumn.appendChild(articleElement));
+
+    // Send a PUT request to the server to update the article's read status
+    const articleLink = encodeURIComponent(article.data.link);
+    fetch(`/articles/${articleLink}/${toColumnStatus}`, { method: "PUT" })
+        .then((response) => response.json())
+        .catch((error) => console.error("Error moving article:", error));
 };
 
 document.addEventListener("keydown", async (event) => {
@@ -137,6 +146,7 @@ document.addEventListener("keydown", async (event) => {
     let articleToMove;
 
     switch (event.key) {
+        // Select article to the left
         case "q":
             // Change current column to the previous one
             currentColumn =
@@ -147,6 +157,7 @@ document.addEventListener("keydown", async (event) => {
                     : Column.FRESH;
             localStorage.setItem("currentColumn", currentColumn);
             break;
+        // Select column to the right
         case "e":
             // Change current column to the next one
             currentColumn =
@@ -157,6 +168,7 @@ document.addEventListener("keydown", async (event) => {
                     : Column.SAVED;
             localStorage.setItem("currentColumn", currentColumn);
             break;
+        // Select article above
         case "w":
             // Change current article to the previous one in the current column, cyclical
             currentArticle[currentColumn] =
@@ -167,6 +179,7 @@ document.addEventListener("keydown", async (event) => {
                 JSON.stringify(currentArticle)
             );
             break;
+        // Select article below
         case "s":
             // Change current article to the next one in the current column, cyclical
             currentArticle[currentColumn] =
@@ -176,30 +189,33 @@ document.addEventListener("keydown", async (event) => {
                 JSON.stringify(currentArticle)
             );
             break;
+        // Move article left
         case "a":
             if (columns[currentColumn].childElementCount !== 0) {
                 articleToMove = articles[currentArticle[currentColumn]];
                 const toColumn =
                     currentColumn === Column.FRESH
-                        ? columns[Column.SAVED]
+                        ? Column.SAVED
                         : currentColumn === Column.SAVED
-                        ? columns[Column.ARCHIVED]
-                        : columns[Column.FRESH];
-                moveArticle(articleToMove, columns[currentColumn], toColumn);
+                        ? Column.ARCHIVED
+                        : Column.FRESH;
+                moveArticle(articleToMove, currentColumn, toColumn);
             }
             break;
+        // Move article right
         case "d":
             if (columns[currentColumn].childElementCount !== 0) {
                 articleToMove = articles[currentArticle[currentColumn]];
                 const toColumn =
                     currentColumn === Column.FRESH
-                        ? columns[Column.ARCHIVED]
+                        ? Column.ARCHIVED
                         : currentColumn === Column.SAVED
-                        ? columns[Column.FRESH]
-                        : columns[Column.SAVED];
-                moveArticle(articleToMove, columns[currentColumn], toColumn);
+                        ? Column.FRESH
+                        : Column.SAVED;
+                moveArticle(articleToMove, currentColumn, toColumn);
             }
             break;
+        // Undo
         case "z":
             if (event.ctrlKey && undoStack.length > 0) {
                 const { article, fromColumn, toColumn } = undoStack.pop();
@@ -211,6 +227,7 @@ document.addEventListener("keydown", async (event) => {
                 fromColumn.appendChild(article);
             }
             break;
+        // Redo
         case "Z":
             if (event.ctrlKey && event.shiftKey && redoStack.length > 0) {
                 const { article, fromColumn, toColumn } = redoStack.pop();
@@ -221,6 +238,14 @@ document.addEventListener("keydown", async (event) => {
                 });
                 fromColumn.appendChild(article);
             }
+            break;
+        // Reset to first article in current column
+        case "r":
+            currentArticle[currentColumn] = 0;
+            localStorage.setItem(
+                "currentArticle",
+                JSON.stringify(currentArticle)
+            );
             break;
     }
 
@@ -242,7 +267,7 @@ fetchArticles();
 // - Year with 1 decimal place after that
 function format_time_ago(published) {
     // Calculate the duration between the current time and the published date
-    let duration = Math.floor(
+    const duration = Math.floor(
         (new Date().getTime() - published.getTime()) / 1000
     );
 
@@ -250,27 +275,27 @@ function format_time_ago(published) {
     if (duration < 60) {
         return duration + "s";
     } else {
-        let mins = duration / 60;
+        const mins = duration / 60;
         if (mins < 10) {
             return formatDecimal(mins) + "m";
         } else if (mins < 60) {
             return Math.floor(mins) + "m";
         } else {
-            let hours = mins / 60;
+            const hours = mins / 60;
             if (hours < 6) {
                 return formatDecimal(hours) + "h";
             } else if (hours < 24) {
                 return Math.floor(hours) + "h";
             } else {
-                let days = hours / 24;
+                const days = hours / 24;
                 if (days < 7) {
                     return formatDecimal(days) + "d";
                 } else {
-                    let weeks = days / 7;
+                    const weeks = days / 7;
                     if (weeks < 4) {
                         return formatDecimal(weeks) + "w";
                     } else {
-                        let months = days / 30;
+                        const months = days / 30;
                         if (months < 12) {
                             return formatDecimal(months) + "m";
                         } else {
@@ -284,7 +309,7 @@ function format_time_ago(published) {
 }
 
 function formatDecimal(value) {
-    let formattedValue = value.toFixed(1);
+    const formattedValue = value.toFixed(1);
     return formattedValue.endsWith(".0")
         ? formattedValue.slice(0, -2)
         : formattedValue;

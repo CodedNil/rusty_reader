@@ -1,6 +1,6 @@
 mod feed;
 
-use axum::{routing::get, Router};
+use axum::{routing::get, routing::put, Router};
 use std::net::SocketAddr;
 use tokio::time::{interval, Duration};
 use tower_http::services::ServeDir;
@@ -15,6 +15,10 @@ async fn main() {
     let app = Router::new()
         .nest_service("/", ServeDir::new("assets"))
         .route("/articles", get(feed::get_articles))
+        .route(
+            "/articles/:article_link/:new_status",
+            put(feed::update_article_status),
+        )
         .layer(ServiceBuilder::new().layer(CompressionLayer::new()));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
