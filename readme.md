@@ -18,7 +18,8 @@ Press enter to open article in new tab
 
 Backend todo:
 
-Optimise the database stuff so that channels are stored separately from articles, articles give reference to channel
+Make the database summary scraping do it again if the entry.updated is more recent than last pull
+Store the summary/image in the database
 
 Summarise video transcript from youtube to make a description and a non clickbait title
 Show video thumbnail in list

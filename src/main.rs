@@ -48,6 +48,7 @@ async fn main() {
             interval.tick().await;
             println!("Pulling articles");
             pull_articles(db.clone()).await;
+            println!("Done pulling articles");
         }
     };
 
@@ -97,11 +98,10 @@ async fn pull_articles(db: Arc<Db>) {
     let rss_sources = vec![
         "https://www.theverge.com/rss/index.xml",
         "https://www.tomshardware.com/rss.xml",
-        "https://news.ycombinator.com/rss",
-        "http://feeds.bbci.co.uk/news/video_and_audio/technology/rss.xml",
-        "http://feeds.bbci.co.uk/news/video_and_audio/science_and_environment/rss.xml",
+        "https://hnrss.org/frontpage",
+        "http://feeds.bbci.co.uk/news/technology/rss.xml",
+        "http://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
     ];
-    // http://feeds.bbci.co.uk/news/technology/rss.xml
 
     for source in rss_sources {
         let channel_data = match channel::get_channel_data(db.clone(), source).await {
@@ -111,10 +111,10 @@ async fn pull_articles(db: Arc<Db>) {
                 continue;
             }
         };
-        // match process_source(source, &channel_data.link, db.clone()).await {
-        //     Ok(_) => {}
-        //     Err(e) => eprintln!("Error processing source {source}: {e}"),
-        // }
+        match process_source(source, &channel_data.link, db.clone()).await {
+            Ok(_) => {}
+            Err(e) => eprintln!("Error processing source {source}: {e}"),
+        }
     }
 }
 
@@ -163,10 +163,11 @@ async fn process_source(
     channel_link: &str,
     db: Arc<Db>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Processing source {source}");
     let response = reqwest::get(source).await?;
     let bytes = response.bytes().await?;
     let cursor = Cursor::new(bytes);
-    let feed = parser::parse(cursor).unwrap();
+    let feed = parser::parse(cursor)?;
 
     for entry in feed.entries {
         let entry_title = entry.title.unwrap().content;
@@ -179,9 +180,9 @@ async fn process_source(
             .map_or(entry.id.clone(), |link| link.href.clone());
 
         // Check if the article is already in the database
-        // if db.contains_key(&entry_link)? {
-        //     continue;
-        // }
+        if db.contains_key(&entry_link)? {
+            continue;
+        }
 
         // Download the webpage and extract the image
         if let Ok(data) = scrape_website(&entry_link.clone()).await {
@@ -202,21 +203,13 @@ async fn process_source(
     Ok(())
 }
 
-// Function to store a article into the database.
+/// Function to store a article into the database.
 fn store_article_to_db(db: &Db, article: &Article) -> Result<(), Box<dyn std::error::Error>> {
-    // Construct the key for the database insertion using the link from the Article struct.
-    let key = format!("article:{}", &article.link);
-
-    // Serialize the Article struct into a binary format.
-    let value = serialize(article)?;
-
-    // Insert the serialized data into the database with the constructed key.
-    db.insert(key, sled::IVec::from(value))?;
-
-    // Attempt to flush the database to disk.
+    db.insert(
+        format!("article:{}", &article.link),
+        sled::IVec::from(serialize(article)?),
+    )?;
     db.flush()?;
-
-    // If all operations are successful, return Ok.
     Ok(())
 }
 

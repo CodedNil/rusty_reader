@@ -1,16 +1,17 @@
 use bincode::{deserialize, serialize};
 use feed_rs::parser;
+use image::{DynamicImage, GenericImageView};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sled::Db;
-use std::{io::Cursor, sync::Arc};
+use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct Channel {
     pub link: String,
     pub title: String,
     pub icon: String,
-    pub palette: Vec<String>,
+    pub dominant_color: String,
 }
 
 // Function to retrieve a channel from the database based on its link.
@@ -34,20 +35,16 @@ pub fn get_channel_from_db(db: &Db, link: &str) -> Result<Channel, Box<dyn std::
 }
 
 // Function to store a channel into the database.
-fn store_channel_to_db(db: &Db, channel: &Channel) -> Result<(), Box<dyn std::error::Error>> {
-    // Construct the key for the database insertion using the link from the Channel struct.
-    let key = format!("channel:{}", &channel.link);
-
-    // Serialize the Channel struct into a binary format.
-    let value = serialize(channel)?;
-
-    // Insert the serialized data into the database with the constructed key.
-    db.insert(key, sled::IVec::from(value))?;
-
-    // Attempt to flush the database to disk.
+fn store_channel_to_db(
+    db: &Db,
+    channel: &Channel,
+    link: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    db.insert(
+        format!("channel:{link}"),
+        sled::IVec::from(serialize(channel)?),
+    )?;
     db.flush()?;
-
-    // If all operations are successful, return Ok.
     Ok(())
 }
 
@@ -56,9 +53,9 @@ pub async fn get_channel_data(
     source: &str,
 ) -> Result<Channel, Box<dyn std::error::Error>> {
     // Attempt to retrieve the channel from the database.
-    // if let Ok(channel) = get_channel_from_db(&db, source) {
-    //     return Ok(channel);
-    // }
+    if let Ok(channel) = get_channel_from_db(&db, source) {
+        return Ok(channel);
+    }
 
     // If the channel is not in the database, fetch the page feed.
     let response = reqwest::get(source).await?;
@@ -112,17 +109,17 @@ pub async fn get_channel_data(
     };
 
     // If a favicon URL is found, fetch the image and extract its color palette.
-    let palette = if let Some(favicon_url) = &favicon {
+    let dominant_color = if let Some(favicon_url) = &favicon {
+        // Fetch the favicon
         let resp = reqwest::get(favicon_url).await?;
         let bytes = resp.bytes().await?;
-        color_thief::get_palette(&bytes, color_thief::ColorFormat::Rgb, 10, 10)
-            .map(|colors| {
-                colors
-                    .into_iter()
-                    .map(|color| format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b))
-                    .collect()
-            })
-            .ok()
+
+        // Decode the .ico
+        let img = image::load_from_memory(&bytes)
+            .map_err(|_| format!("Failed to decode the image from {favicon_url}"))?;
+
+        // Extract the dominant color from the image
+        get_dominant_color(&img)
     } else {
         None
     };
@@ -132,11 +129,42 @@ pub async fn get_channel_data(
         link: base_url.to_string().clone(),
         title,
         icon: favicon.unwrap_or_default(),
-        palette: palette.unwrap_or_default(),
+        dominant_color: dominant_color.unwrap_or("#000000".to_string()),
     };
 
+    println!("Channel: {channel:?}");
+
     // Store the newly constructed channel in the database.
-    store_channel_to_db(&db, &channel)?;
+    store_channel_to_db(&db, &channel, source)?;
 
     Ok(channel)
+}
+
+fn get_dominant_color(img: &DynamicImage) -> Option<String> {
+    let mut color_count: HashMap<(u8, u8, u8), usize> = HashMap::new();
+
+    for (_x, _y, pixel) in img.pixels() {
+        let r = pixel[0];
+        let g = pixel[1];
+        let b = pixel[2];
+        let a = pixel[3];
+
+        // Skip transparent pixels
+        if a == 0 {
+            continue;
+        }
+
+        let color = (r, g, b);
+        match color_count.get_mut(&color) {
+            Some(count) => *count += 1,
+            None => {
+                color_count.insert(color, 1);
+            }
+        }
+    }
+
+    color_count
+        .into_iter()
+        .max_by_key(|&(_, count)| count)
+        .map(|((r, g, b), _)| format!("#{r:02x}{g:02x}{b:02x}"))
 }
