@@ -1,34 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Rusty Reader</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="style.css" />
+        <meta name="darkreader" content="unmanageable" />
+    </head>
 
-<head>
-    <meta charset="utf-8">
-    <title>Rusty Reader</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="style.css">
-    <meta name="darkreader" content="unmanageable">
-</head>
-
-<body>
-    <div id="main_content" class="main_content">
-        <div id="articlebox-left" class="articlebox left saved">
-            <div id="articles-left" class="articlebox-column">
+    <body>
+        <div id="main_content" class="main_content">
+            <div id="articlebox-left" class="articlebox">
+                <div id="articles-left" class="articlebox-column"></div>
             </div>
-        </div>
-        <div class="center_content">
-            <div id="article-preview" class="articlebox preview"></div>
-            <div id="articlebox-center" class="articlebox center fresh">
-                <div id="articles-center" class="articlebox-column">
+            <div class="center_content">
+                <div id="articlebox-preview" class="articlebox"></div>
+                <div id="articlebox-center" class="articlebox">
+                    <div id="articles-center" class="articlebox-column"></div>
                 </div>
             </div>
-        </div>
-        <div id="articlebox-right" class="articlebox right archived">
-            <div id="articles-right" class="articlebox-column">
+            <div id="articlebox-right" class="articlebox">
+                <div id="articles-right" class="articlebox-column"></div>
             </div>
         </div>
-    </div>
 
-    <script src="main.js"></script>
-</body>
-
+        <script src="main.js"></script>
+    </body>
 </html>

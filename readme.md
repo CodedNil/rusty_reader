@@ -22,19 +22,17 @@ Import and export opml
 
 Offline reading
 
-
 Page background wallpaper ai driven, base on time of day, weather etc make a prompt for midjouney
-
 
 Top portion is article/video currently selected, keybind to expand
 3 Columns, archived, fresh, saved
 Navigate articles with wasd, as you move down the article selected comes to the top and previous one goes to bottom of list, cyclically
+Display a line indicating where the order rests, and press r to reset to the first in the list, displayed by date
 Move sideways to save or archive
 QE to move between columns
 
 Get icon for channel from the urls favicon instead of the rss icon
 Use image-thief to get icons dominant colour, render the background of the article with that
-
 
 Workspaces? Have additional feeds like spam with reddit etc that you toggle on if you want to just browse for ages
 Also separate workspaces for certain topics outside of your main feeds

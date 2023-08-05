@@ -13,12 +13,12 @@ const fetchArticles = async () => {
             const published = format_time_ago(article.published);
 
             articleElement.innerHTML = `
-                <a class="feed-link" href="${article.link}">${article.title}</a>
-                <div class="feed-date">${published}</div>
-                <img class="feed-icon" src="${article.channel.icon}">
+                <a class="article-link" href="${article.link}">${article.title}</a>
+                <div class="article-date">${published}</div>
+                <img class="article-icon" src="${article.channel.icon}">
             `;
-            articleElement.style.display = "flex";
-            articleElement.style.flexDirection = "row";
+            // Add class article
+            articleElement.classList.add("article");
 
             articlesCenter.appendChild(articleElement);
         }
@@ -29,7 +29,17 @@ const fetchArticles = async () => {
 
 fetchArticles();
 
-/// Format the published date to a human readable format, -30s, -2m 5s, -1h 30m, etc
+// This function takes a date string as input and returns a string representing how much time has passed since that date.
+// The output format is as follows:
+// - Seconds if under a minute (e.g., "-5s")
+// - Minutes with 1 decimal place if under 10 minutes (e.g., "-4.5m")
+// - Just minutes if under 1 hour (e.g., "-20m")
+// - Hours with 1 decimal place if under 6 hours (e.g., "-1.5h")
+// - Just hours if under 24 hours
+// - Days with 1 decimal place if under a week
+// - Weeks with 1 decimal place if under a month
+// - Months with 1 decimal place if under a year
+// - Year with 1 decimal place after that
 function format_time_ago(published) {
     published = published.replace(" ", "T").replace(" ", "");
     let publishedDate = new Date(published);
@@ -41,34 +51,44 @@ function format_time_ago(published) {
 
     // Depending on the duration, format it in different ways
     if (duration < 60) {
-        return "-" + duration + "s";
+        return duration + "s";
     } else {
-        let mins = Math.floor(duration / 60);
-        if (mins < 60) {
-            return "-" + mins + "m " + (duration % 60) + "s";
+        let mins = duration / 60;
+        if (mins < 10) {
+            return formatDecimal(mins) + "m";
+        } else if (mins < 60) {
+            return Math.floor(mins) + "m";
         } else {
-            let hours = Math.floor(mins / 60);
-            if (hours < 24) {
-                return "-" + hours + "h " + (mins % 60) + "m";
+            let hours = mins / 60;
+            if (hours < 6) {
+                return formatDecimal(hours) + "h";
+            } else if (hours < 24) {
+                return Math.floor(hours) + "h";
             } else {
-                let days = Math.floor(hours / 24);
+                let days = hours / 24;
                 if (days < 7) {
-                    return "-" + days + "d " + (hours % 24) + "h";
+                    return formatDecimal(days) + "d";
                 } else {
-                    let weeks = Math.floor(days / 7);
+                    let weeks = days / 7;
                     if (weeks < 4) {
-                        return "-" + weeks + "w " + (days % 7) + "d";
+                        return formatDecimal(weeks) + "w";
                     } else {
-                        return (
-                            "-" +
-                            Math.floor(days / 30) +
-                            "m " +
-                            (days % 30) +
-                            "d"
-                        );
+                        let months = days / 30;
+                        if (months < 12) {
+                            return formatDecimal(months) + "m";
+                        } else {
+                            return formatDecimal(days / 365) + "y";
+                        }
                     }
                 }
             }
         }
     }
+}
+
+function formatDecimal(value) {
+    let formattedValue = value.toFixed(1);
+    return formattedValue.endsWith(".0")
+        ? formattedValue.slice(0, -2)
+        : formattedValue;
 }

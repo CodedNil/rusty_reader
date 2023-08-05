@@ -14,7 +14,7 @@ body {
     flex-direction: row;
     width: 100%;
     height: 100vh;
-    gap: 20px;
+    gap: 10px;
     padding: 20px;
     box-sizing: border-box;
 }
@@ -23,79 +23,89 @@ body {
     display: flex;
     flex-direction: column;
     width: 50%;
-    gap: 20px;
+    gap: 10px;
 }
 
 /* Article Box */
 .articlebox {
-    border-radius: 10px;
-    backdrop-filter: blur(6px);
+    border-radius: 6px;
+    backdrop-filter: blur(10px);
     width: 25%;
     overflow: hidden;
-    border-style: solid;
-    border-width: 2px;
-    border-color: rgb(230, 230, 230);
+    background-color: rgba(32, 35, 42, 0.8);
+    padding: 10px;
+    box-sizing: border-box;
 }
 
 .articlebox-column {
     height: 100%;
-    width: 100%;
     display: flex;
     flex-direction: column;
-    overflow-y: scroll;
-    scrollbar-color: rgb(42, 42, 42) transparent;
+    overflow-y: auto;
+    scrollbar-color: white rgba(255, 255, 255, 0.2);
     scrollbar-width: thin;
+    gap: 4px;
 }
 
-.articlebox.center {
+#articlebox-center {
     width: 100%;
     height: 60%;
 }
 
-.articlebox.saved {
-    background-color: #94823ad0;
-}
-
-.articlebox.fresh {
-    background-color: #498f49d0;
-}
-
-.articlebox.archived {
-    background-color: #8f5252d0;
-}
-
-.articlebox.preview {
+#articlebox-preview {
     width: 100%;
     height: 40%;
-    background-color: #3b3b52d0;
 }
 
-/* Feeds */
-.feed-link {
+/* Articles */
+.article {
+    display: flex;
+    flex-direction: row;
+    padding: 4px;
+    background-color: rgba(73, 143, 73, 0.6);
+    border-radius: 2px;
+}
+
+.article.fresh {
+    background-color: rgba(73, 143, 73, 0.6);
+}
+
+.article.saved {
+    background-color: rgba(148, 130, 58, 0.6);
+}
+
+.article.archived {
+    background-color: rgba(143, 82, 82, 0.6);
+}
+
+.article-link {
     color: white;
-    font-family: Arial, sans-serif;
-    font-size: 1rem;
+    font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 600;
+    font-size: 14px;
     text-decoration: none;
     width: 100%;
 }
 
-.feed-link:visited {
-    color: lightblue;
+.article-link:visited {
+    color: hsl(240, 8%, 65%);
 }
 
-.feed-date {
+.article-date {
     color: white;
-    font-family: Arial, sans-serif;
-    font-size: 0.5rem;
-    margin-left: 0.5rem;
+    font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    margin-left: 12px;
+    margin-right: 6px;
+    white-space: nowrap;
     text-decoration: none;
 }
 
-.feed-date:visited {
+.article-date:visited {
     color: lightblue;
 }
 
-.feed-icon {
-    margin-left: 0.5rem;
-    height: 100%;
+.article-icon {
+    height: 16px;
+    width: 16px;
 }
