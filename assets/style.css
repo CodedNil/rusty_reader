@@ -3,6 +3,9 @@ body {
     margin: 0;
     padding: 0;
     background: #20232a;
+    background-image: url("background.webp");
+    background-position: center;
+    background-size: cover;
 }
 
 /* Main Content */
@@ -26,10 +29,12 @@ body {
 /* Article Box */
 .articlebox {
     border-radius: 10px;
-    backdrop-filter: blur(30px);
-    opacity: 0.8;
+    backdrop-filter: blur(6px);
     width: 25%;
     overflow: hidden;
+    border-style: solid;
+    border-width: 2px;
+    border-color: rgb(230, 230, 230);
 }
 
 .articlebox-column {
@@ -48,21 +53,21 @@ body {
 }
 
 .articlebox.saved {
-    background-color: #796b47;
+    background-color: #94823ad0;
 }
 
 .articlebox.fresh {
-    background-color: #406540;
+    background-color: #498f49d0;
 }
 
 .articlebox.archived {
-    background-color: #4d2e2e;
+    background-color: #8f5252d0;
 }
 
 .articlebox.preview {
     width: 100%;
     height: 40%;
-    background-color: #383861;
+    background-color: #3b3b52d0;
 }
 
 /* Feeds */

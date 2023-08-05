@@ -23,6 +23,9 @@ Import and export opml
 Offline reading
 
 
+Page background wallpaper ai driven, base on time of day, weather etc make a prompt for midjouney
+
+
 Top portion is article/video currently selected, keybind to expand
 3 Columns, archived, fresh, saved
 Navigate articles with wasd, as you move down the article selected comes to the top and previous one goes to bottom of list, cyclically

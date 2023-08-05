@@ -2,7 +2,7 @@ mod feed;
 
 use std::net::SocketAddr;
 
-use axum::Router;
+use axum::{routing::get, Router};
 use tokio::time::{interval, Duration};
 use tower_http::services::ServeDir;
 
@@ -10,7 +10,9 @@ use tower_http::services::ServeDir;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let app = Router::new().nest_service("/", ServeDir::new("assets"));
+    let app = Router::new()
+        .nest_service("/", ServeDir::new("assets"))
+        .route("/articles", get(feed::get_articles));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Listening on {addr}");

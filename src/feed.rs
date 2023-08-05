@@ -1,5 +1,7 @@
 use atom_syndication::Feed;
+use axum::response::Json;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::io::Cursor;
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
@@ -95,8 +97,8 @@ async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error
 }
 
 /// Get articles from the database
-pub fn get_articles() -> ArticleServe {
-    println!("Getting articles from database");
+#[allow(clippy::unused_async)]
+pub async fn get_articles() -> Json<Value> {
     let db = sled::open("database").expect("Failed to open the database");
     let mut articles = ArticleServe {
         fresh: Vec::new(),
@@ -114,5 +116,5 @@ pub fn get_articles() -> ArticleServe {
         }
     }
 
-    articles
+    Json(json!(articles))
 }
