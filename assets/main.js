@@ -22,9 +22,7 @@ const fetchArticles = async () => {
         const response = await fetch("/articles");
         const data = await response.json();
         for (const article of data) {
-            article.published = new Date(
-                article.published.replace(" ", "T").replace(" ", "")
-            );
+            article.published = new Date(article.published);
         }
 
         columns[Column.FRESH] = document.getElementById("articles-center");

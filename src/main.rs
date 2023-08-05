@@ -1,3 +1,5 @@
+mod channel;
+
 use axum::{
     extract::Path,
     response::{IntoResponse, Json},
@@ -79,17 +81,9 @@ impl FromStr for ReadStatus {
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
-struct Channel {
-    link: String,
-    title: String,
-    icon: String,
-    palette: Vec<String>,
-}
-
-#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 struct Article {
     link: String,
-    channel: Channel,
+    channel: channel::Channel,
     title: String,
     published: String,
     image: String,
@@ -107,6 +101,13 @@ async fn pull_articles(db: Arc<Db>) {
     // http://feeds.bbci.co.uk/news/technology/rss.xml
 
     for source in rss_sources {
+        let channel_data = match channel::get_channel_data(db.clone(), source).await {
+            Ok(channel_data) => channel_data,
+            Err(e) => {
+                eprintln!("Error getting channel data for {source}: {e}");
+                continue;
+            }
+        };
         match process_source(source, db.clone()).await {
             Ok(_) => {}
             Err(e) => eprintln!("Error processing source {source}: {e}"),
@@ -205,16 +206,21 @@ async fn process_source(source: &str, db: Arc<Db>) -> Result<(), Box<dyn std::er
     for entry in feed.entries {
         let entry_title = entry.title.unwrap().content;
         let entry_summary = entry.summary.map_or_else(String::new, |s| s.content);
-        let entry_published = entry.published.unwrap_or_default();
+        let entry_published: chrono::DateTime<chrono::Utc> = entry.published.unwrap_or_default();
+        // Get the entry first link or use the entry id
+        let entry_link = entry
+            .links
+            .first()
+            .map_or(entry.id.clone(), |link| link.href.clone());
 
         // Check if the article is already in the database
-        // if db.contains_key(&entry.id)? {
+        // if db.contains_key(&entry_link)? {
         //     continue;
         // }
 
         // Download the webpage and extract the image
-        if let Ok(data) = scrape_website(&entry.id.clone()).await {
-            let channel = Channel {
+        if let Ok(data) = scrape_website(&entry_link.clone()).await {
+            let channel = channel::Channel {
                 link: feed.id.clone(),
                 title: feed.title.clone().unwrap().content.clone(),
                 icon: data.favicon.unwrap_or_default(),
@@ -222,10 +228,10 @@ async fn process_source(source: &str, db: Arc<Db>) -> Result<(), Box<dyn std::er
             };
 
             let article = Article {
-                link: entry.id,
+                link: entry_link,
                 channel,
                 title: entry_title,
-                published: entry_published.to_string(),
+                published: entry_published.to_rfc3339(),
                 image: data.image.unwrap_or_default(),
                 summary: data.main_content.unwrap_or(entry_summary),
                 read_status: ReadStatus::Fresh,
