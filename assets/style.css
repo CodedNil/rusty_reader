@@ -101,10 +101,6 @@ body {
     text-decoration: none;
 }
 
-.article-date:visited {
-    color: lightblue;
-}
-
 .article-icon {
     height: 16px;
     width: 16px;

@@ -2,10 +2,15 @@ const fetchArticles = async () => {
     try {
         const response = await fetch("/articles");
         const data = await response.json();
-        const articlesCenter = document.getElementById("articles-center");
 
-        if (!articlesCenter) {
-            throw new Error('Element with id "articles-center" not found');
+        const articlesLeft = document.getElementById("articles-left");
+        const articlesCenter = document.getElementById("articles-center");
+        const articlesRight = document.getElementById("articles-right");
+
+        if (!articlesCenter || !articlesLeft || !articlesRight) {
+            throw new Error(
+                "One or more elements (articles-center, articles-left, articles-right) not found"
+            );
         }
 
         for (const article of data) {
@@ -17,10 +22,15 @@ const fetchArticles = async () => {
                 <div class="article-date">${published}</div>
                 <img class="article-icon" src="${article.channel.icon}">
             `;
-            // Add class article
             articleElement.classList.add("article");
 
-            articlesCenter.appendChild(articleElement);
+            if (article.read_status === "Fresh") {
+                articlesCenter.appendChild(articleElement);
+            } else if (article.read_status === "Saved") {
+                articlesLeft.appendChild(articleElement);
+            } else if (article.read_status === "Archived") {
+                articlesRight.appendChild(articleElement);
+            }
         }
     } catch (error) {
         console.error(error);

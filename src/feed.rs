@@ -1,7 +1,7 @@
 use atom_syndication::Feed;
-use axum::response::Json;
+use axum::response::{IntoResponse, Json};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::io::Cursor;
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
@@ -91,7 +91,7 @@ async fn process_source(source: &str) -> Result<Vec<Article>, Box<dyn std::error
 
 /// Get articles from the database
 #[allow(clippy::unused_async)]
-pub async fn get_articles() -> Json<Value> {
+pub async fn get_articles() -> impl IntoResponse {
     let db = sled::open("database").expect("Failed to open the database");
     let articles: Vec<Article> = db
         .iter()
