@@ -6,6 +6,7 @@ use axum::{
     routing::{get, put},
     Router,
 };
+use bincode::{deserialize, serialize};
 use feed_rs::parser;
 use readability::extractor;
 use scraper::{Html, Selector};
@@ -83,7 +84,7 @@ impl FromStr for ReadStatus {
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 struct Article {
     link: String,
-    channel: channel::Channel,
+    channel: String,
     title: String,
     published: String,
     image: String,
@@ -95,8 +96,10 @@ struct Article {
 async fn pull_articles(db: Arc<Db>) {
     let rss_sources = vec![
         "https://www.theverge.com/rss/index.xml",
-        // "https://www.tomshardware.com/rss.xml",
-        "https://hnrss.org/frontpage",
+        "https://www.tomshardware.com/rss.xml",
+        "https://news.ycombinator.com/rss",
+        "http://feeds.bbci.co.uk/news/video_and_audio/technology/rss.xml",
+        "http://feeds.bbci.co.uk/news/video_and_audio/science_and_environment/rss.xml",
     ];
     // http://feeds.bbci.co.uk/news/technology/rss.xml
 
@@ -108,10 +111,10 @@ async fn pull_articles(db: Arc<Db>) {
                 continue;
             }
         };
-        match process_source(source, channel_data, db.clone()).await {
-            Ok(_) => {}
-            Err(e) => eprintln!("Error processing source {source}: {e}"),
-        }
+        // match process_source(source, &channel_data.link, db.clone()).await {
+        //     Ok(_) => {}
+        //     Err(e) => eprintln!("Error processing source {source}: {e}"),
+        // }
     }
 }
 
@@ -157,7 +160,7 @@ async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Er
 
 async fn process_source(
     source: &str,
-    channel: channel::Channel,
+    channel_link: &str,
     db: Arc<Db>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let response = reqwest::get(source).await?;
@@ -184,7 +187,7 @@ async fn process_source(
         if let Ok(data) = scrape_website(&entry_link.clone()).await {
             let article = Article {
                 link: entry_link,
-                channel: channel.clone(),
+                channel: channel_link.to_string().clone(),
                 title: entry_title,
                 published: entry_published.to_rfc3339(),
                 image: data.image.unwrap_or_default(),
@@ -192,21 +195,68 @@ async fn process_source(
                 read_status: ReadStatus::Fresh,
             };
 
-            let key = article.link.clone();
-            let value = serde_json::to_vec(&article).unwrap();
-            db.insert(key, value).unwrap();
+            let _ = store_article_to_db(&db, &article);
         };
     }
 
     Ok(())
 }
 
+// Function to store a article into the database.
+fn store_article_to_db(db: &Db, article: &Article) -> Result<(), Box<dyn std::error::Error>> {
+    // Construct the key for the database insertion using the link from the Article struct.
+    let key = format!("article:{}", &article.link);
+
+    // Serialize the Article struct into a binary format.
+    let value = serialize(article)?;
+
+    // Insert the serialized data into the database with the constructed key.
+    db.insert(key, sled::IVec::from(value))?;
+
+    // Attempt to flush the database to disk.
+    db.flush()?;
+
+    // If all operations are successful, return Ok.
+    Ok(())
+}
+
+/// Struct to represent the full article with its associated channel.
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
+struct FullArticle {
+    link: String,
+    channel: channel::Channel,
+    title: String,
+    published: String,
+    image: String,
+    summary: String,
+    read_status: ReadStatus,
+}
+
 /// Get articles from the database
 #[allow(clippy::unused_async)]
 async fn get_articles(db: Arc<Db>) -> impl IntoResponse {
-    let articles: Vec<Article> = db
-        .iter()
-        .map(|item| serde_json::from_slice(&item.unwrap().1).unwrap())
+    // Use scan_prefix to get all keys starting with "article:"
+    let articles: Vec<FullArticle> = db
+        .scan_prefix("article:")
+        .filter_map(Result::ok) // Filter out potential errors from the database
+        .filter_map(|(_, value)| {
+            // Try to deserialize each value into an Article
+            let article: Article = deserialize(&value).ok()?;
+
+            // Fetch the associated channel from the database
+            let channel = channel::get_channel_from_db(&db, &article.channel).ok()?;
+
+            // Construct the FullArticle with the associated channel
+            Some(FullArticle {
+                link: article.link,
+                channel,
+                title: article.title,
+                published: article.published,
+                image: article.image,
+                summary: article.summary,
+                read_status: article.read_status,
+            })
+        })
         .collect();
 
     Json(json!(articles))
