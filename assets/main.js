@@ -45,6 +45,7 @@ const fetchArticles = async () => {
             `;
             articleElement.classList.add("article");
             articleElement.data = article;
+            articleElement.style.backgroundColor = article.channel.palette[0];
 
             if (article.read_status === Column.FRESH) {
                 columns[Column.FRESH].appendChild(articleElement);

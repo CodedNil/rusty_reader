@@ -1,20 +1,22 @@
-use atom_syndication::Feed;
 use axum::{
     extract::Path,
     response::{IntoResponse, Json},
+    routing::{get, put},
+    Router,
 };
-use axum::{routing::get, routing::put, Router};
+use feed_rs::parser;
 use readability::extractor;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sled::Db;
-use std::net::SocketAddr;
-use std::{io::Cursor, str::FromStr, sync::Arc};
 use tokio::time::{interval, Duration};
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
+
+// Standard library
+use std::{io::Cursor, net::SocketAddr, str::FromStr, sync::Arc};
 
 #[tokio::main]
 async fn main() {
@@ -97,8 +99,12 @@ struct Article {
 
 /// Get articles and write them to the database
 async fn pull_articles(db: Arc<Db>) {
-    let rss_sources = vec!["https://www.theverge.com/rss/index.xml"];
-    // http://feeds.bbci.co.uk/news/technology/rss.xml  https://hnrss.org/frontpage
+    let rss_sources = vec![
+        "https://www.theverge.com/rss/index.xml",
+        // "https://www.tomshardware.com/rss.xml",
+        "https://hnrss.org/frontpage",
+    ];
+    // http://feeds.bbci.co.uk/news/technology/rss.xml
 
     for source in rss_sources {
         match process_source(source, db.clone()).await {
@@ -194,43 +200,41 @@ async fn process_source(source: &str, db: Arc<Db>) -> Result<(), Box<dyn std::er
     let response = reqwest::get(source).await?;
     let bytes = response.bytes().await?;
     let cursor = Cursor::new(bytes);
-    let feed = Feed::read_from(cursor).unwrap();
+    let feed = parser::parse(cursor).unwrap();
 
     for entry in feed.entries {
-        let entry_title = entry.title.value;
-        let entry_summary = entry.summary.map_or_else(String::new, |s| s.value);
+        let entry_title = entry.title.unwrap().content;
+        let entry_summary = entry.summary.map_or_else(String::new, |s| s.content);
         let entry_published = entry.published.unwrap_or_default();
 
         // Check if the article is already in the database
-        if db.contains_key(&entry.id)? {
-            continue;
-        }
+        // if db.contains_key(&entry.id)? {
+        //     continue;
+        // }
 
         // Download the webpage and extract the image
-        let data = scrape_website(&entry.id.clone()).await?;
+        if let Ok(data) = scrape_website(&entry.id.clone()).await {
+            let channel = Channel {
+                link: feed.id.clone(),
+                title: feed.title.clone().unwrap().content.clone(),
+                icon: data.favicon.unwrap_or_default(),
+                palette: data.palette.unwrap_or_default(),
+            };
 
-        let channel = Channel {
-            link: feed.id.clone(),
-            title: feed.title.value.clone(),
-            icon: data
-                .favicon
-                .unwrap_or(feed.icon.clone().unwrap_or_default()),
-            palette: data.palette.unwrap_or_default(),
+            let article = Article {
+                link: entry.id,
+                channel,
+                title: entry_title,
+                published: entry_published.to_string(),
+                image: data.image.unwrap_or_default(),
+                summary: data.main_content.unwrap_or(entry_summary),
+                read_status: ReadStatus::Fresh,
+            };
+
+            let key = article.link.clone();
+            let value = serde_json::to_vec(&article).unwrap();
+            db.insert(key, value).unwrap();
         };
-
-        let article = Article {
-            link: entry.id,
-            channel,
-            title: entry_title,
-            published: entry_published.to_string(),
-            image: data.image.unwrap_or_default(),
-            summary: data.main_content.unwrap_or(entry_summary),
-            read_status: ReadStatus::Fresh,
-        };
-
-        let key = article.link.clone();
-        let value = serde_json::to_vec(&article).unwrap();
-        db.insert(key, value).unwrap();
     }
 
     Ok(())
