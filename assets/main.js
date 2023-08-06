@@ -115,14 +115,15 @@ const highlightCurrentArticle = () => {
 };
 
 const setupPreview = (articleElement) => {
-    const preview = document.getElementById("articlebox-preview");
     const header = document.getElementById("preview-header");
     const date = document.getElementById("preview-date");
     const text = document.getElementById("preview-text");
+    const image = document.getElementById("preview-image");
 
     header.innerHTML = articleElement.data.title;
     date.innerHTML = articleElement.data.published.toDateString();
     text.innerHTML = articleElement.data.summary;
+    image.src = articleElement.data.image;
 };
 
 const undoStack = [];

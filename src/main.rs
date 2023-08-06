@@ -1,5 +1,6 @@
 mod articles;
 mod channel;
+mod gpt;
 
 use axum::{
     extract::Path,

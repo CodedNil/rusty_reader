@@ -59,16 +59,17 @@ body {
 
 #articlebox-center {
     width: 100%;
-    height: 60%;
+    height: 100%;
 }
 
 /* Preview */
 #articlebox-preview {
     width: 100%;
-    height: 40%;
+    height: 100%;
     color: white;
     font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
     text-align: center;
+    overflow: visible;
 }
 
 #preview-header {
@@ -78,13 +79,21 @@ body {
 }
 
 #preview-date {
-    font-size: 12px;
+    font-size: 13px;
     margin: 0;
 }
 
 #preview-text {
-    font-size: 10px;
+    font-size: 13px;
     margin: 10px 0;
+}
+
+#preview-image {
+    width: 100%;
+    /* Make image cover */
+    object-fit: cover;
+    /* Make image fill box */
+    object-position: center;
 }
 
 /* Articles */

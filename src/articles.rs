@@ -43,11 +43,16 @@ struct Article {
 #[derive(Debug)]
 struct WebpageData {
     image: Option<String>,
-    main_content: Option<String>,
+    summary: Option<String>,
+    new_title: Option<String>,
 }
 
 /// Website scraping for data
-async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Error>> {
+async fn scrape_website(
+    db: Arc<Db>,
+    title: String,
+    url: &str,
+) -> Result<WebpageData, Box<dyn std::error::Error>> {
     // Download the webpage and parse the html
     let resp = reqwest::get(url).await?;
     let body = resp.text().await?;
@@ -63,19 +68,36 @@ async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Er
     });
 
     // Get the main content using the readability crate
-    let main_content = match url::Url::parse(url) {
+    let summary = match url::Url::parse(url) {
         Ok(url_obj) => {
             let mut body_cursor = Cursor::new(body);
-            extractor::extract(&mut body_cursor, &url_obj)
+            let main_content = extractor::extract(&mut body_cursor, &url_obj)
                 .ok()
-                .map(|content| content.content)
+                .map(|content| content.content);
+
+            if main_content.is_some() {
+                // Use GPT3.5 to summarize the article
+                let summary =
+                    crate::gpt::summarise_article(db, title, main_content.unwrap()).await?;
+                Some(summary)
+            } else {
+                None
+            }
         }
         Err(_) => None,
     };
 
+    if let Some(summary) = summary {
+        return Ok(WebpageData {
+            image,
+            summary: Some(summary.summary),
+            new_title: Some(summary.title),
+        });
+    }
     Ok(WebpageData {
         image,
-        main_content,
+        summary: None,
+        new_title: None,
     })
 }
 
@@ -101,14 +123,14 @@ pub async fn process_source(
         // Check if the article is already in the database
         if !db.contains_key(format!("article:{}", &entry_link))? {
             // Download the webpage and extract the image
-            if let Ok(data) = scrape_website(&entry_link).await {
+            if let Ok(data) = scrape_website(db.clone(), entry_title.clone(), &entry_link).await {
                 let article = Article {
                     link: entry_link,
                     channel: source.clone(),
-                    title: entry_title,
+                    title: data.new_title.unwrap_or(entry_title),
                     published: entry_published.to_rfc3339(),
                     image: data.image.unwrap_or_default(),
-                    summary: data.main_content.unwrap_or(entry_summary),
+                    summary: data.summary.unwrap_or(entry_summary),
                     read_status: ReadStatus::Fresh,
                 };
                 store_article_to_db(&db, &article)?;
