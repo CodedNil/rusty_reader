@@ -54,24 +54,23 @@ async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Er
     let document = Html::parse_document(&body);
 
     // Get the first image
-    let image = if let Ok(image_selector) = Selector::parse("img") {
+    let image = Selector::parse("img").ok().and_then(|selector| {
         document
-            .select(&image_selector)
+            .select(&selector)
             .next()
             .and_then(|element| element.value().attr("src"))
             .map(String::from)
-    } else {
-        None
-    };
+    });
 
     // Get the main content using the readability crate
-    let main_content = if let Ok(url_obj) = url::Url::parse(url) {
-        let mut body_cursor = Cursor::new(body.clone());
-        extractor::extract(&mut body_cursor, &url_obj)
-            .ok()
-            .map(|content| content.content)
-    } else {
-        None
+    let main_content = match url::Url::parse(url) {
+        Ok(url_obj) => {
+            let mut body_cursor = Cursor::new(body);
+            extractor::extract(&mut body_cursor, &url_obj)
+                .ok()
+                .map(|content| content.content)
+        }
+        Err(_) => None,
     };
 
     Ok(WebpageData {
@@ -91,34 +90,30 @@ pub async fn process_source(
     let feed = parser::parse(cursor)?;
 
     for entry in feed.entries {
-        let entry_title = entry.title.unwrap().content;
-        let entry_summary = entry.summary.map_or_else(String::new, |s| s.content);
-        let entry_published: chrono::DateTime<chrono::Utc> = entry.published.unwrap_or_default();
-        // Get the entry first link or use the entry id
+        let entry_title = entry.title.map_or(String::new(), |t| t.content);
+        let entry_summary = entry.summary.map_or(String::new(), |s| s.content);
+        let entry_published = entry.published.unwrap_or_default();
         let entry_link = entry
             .links
             .first()
             .map_or(entry.id.clone(), |link| link.href.clone());
 
         // Check if the article is already in the database
-        if db.contains_key(format!("article:{}", &entry_link))? {
-            continue;
-        }
-
-        // Download the webpage and extract the image
-        if let Ok(data) = scrape_website(&entry_link.clone()).await {
-            let article = Article {
-                link: entry_link,
-                channel: source.to_string().clone(),
-                title: entry_title,
-                published: entry_published.to_rfc3339(),
-                image: data.image.unwrap_or_default(),
-                summary: data.main_content.unwrap_or(entry_summary),
-                read_status: ReadStatus::Fresh,
+        if !db.contains_key(format!("article:{}", &entry_link))? {
+            // Download the webpage and extract the image
+            if let Ok(data) = scrape_website(&entry_link).await {
+                let article = Article {
+                    link: entry_link,
+                    channel: source.clone(),
+                    title: entry_title,
+                    published: entry_published.to_rfc3339(),
+                    image: data.image.unwrap_or_default(),
+                    summary: data.main_content.unwrap_or(entry_summary),
+                    read_status: ReadStatus::Fresh,
+                };
+                store_article_to_db(&db, &article)?;
             };
-
-            let _ = store_article_to_db(&db, &article);
-        };
+        }
     }
 
     Ok(())
@@ -147,10 +142,8 @@ fn get_article_from_db(db: &Db, link: &str) -> Result<Article, Box<dyn std::erro
 /// Function to store a article into the database.
 fn store_article_to_db(db: &Db, article: &Article) -> Result<(), Box<dyn std::error::Error>> {
     println!("Storing article {}", article.link);
-    db.insert(
-        format!("article:{}", &article.link),
-        sled::IVec::from(serialize(article)?),
-    )?;
+    let key = format!("article:{}", &article.link);
+    db.insert(key, sled::IVec::from(serialize(article)?))?;
     db.flush()?;
     Ok(())
 }
@@ -170,18 +163,12 @@ struct FullArticle {
 /// Get articles from the database
 #[allow(clippy::unused_async, clippy::module_name_repetitions)]
 pub async fn get_articles(db: Arc<Db>) -> impl IntoResponse {
-    // Use scan_prefix to get all keys starting with "article:"
     let articles: Vec<FullArticle> = db
         .scan_prefix("article:")
-        .filter_map(Result::ok) // Filter out potential errors from the database
+        .filter_map(Result::ok)
         .filter_map(|(_, value)| {
-            // Try to deserialize each value into an Article
             let article: Article = deserialize(&value).ok()?;
-
-            // Fetch the associated channel from the database
             let channel = crate::channel::get_channel_from_db(&db, &article.channel).ok()?;
-
-            // Construct the FullArticle with the associated channel
             Some(FullArticle {
                 link: article.link,
                 channel,
@@ -193,8 +180,6 @@ pub async fn get_articles(db: Arc<Db>) -> impl IntoResponse {
             })
         })
         .collect();
-
-    println!("Found {} articles", articles.len());
 
     Json(json!(articles))
 }
@@ -231,16 +216,13 @@ pub async fn update_article_status(
         }
     };
 
-    // Update the read status
+    // Update the read status and store the article in the database
     article.read_status = new_status_enum;
-
-    // Store the updated article in the database
     if let Err(e) = store_article_to_db(&db, &article) {
         return Json(
             json!({"status": "error", "message": format!("Failed to store updated article in database: {}", e)}),
         );
     }
 
-    // Return a success response
     Json(json!({"status": "success", "message": "Article status updated successfully"}))
 }
