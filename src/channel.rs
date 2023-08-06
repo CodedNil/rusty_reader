@@ -12,7 +12,6 @@ use std::{collections::HashMap, io::Cursor};
 pub struct ChannelOptional {
     pub category: Option<String>,
     pub rss_url: String,
-    pub link: Option<String>,
     pub title: Option<String>,
     pub icon: Option<String>,
     pub dominant_color: Option<String>,
@@ -22,7 +21,6 @@ pub struct ChannelOptional {
 pub struct Channel {
     pub category: String,
     pub rss_url: String,
-    pub link: String,
     pub title: String,
     pub icon: String,
     pub dominant_color: String,
@@ -126,33 +124,10 @@ pub async fn get_channel_data(
             .unwrap_or("#000000".to_string())
         };
 
-        // Custom youtube data
-        if is_youtube {
-            // println!("Youtube channel detected");
-            // let channel_id = source
-            //     .rss_url
-            //     .split('=')
-            //     .last()
-            //     .unwrap_or_default()
-            //     .to_string();
-
-            // let resp = reqwest::get(format!("https://piped.video/channel/{channel_id}"))
-            //     .await?
-            //     .text()
-            //     .await?;
-            // // let document = Html::parse_document(&reqwest::get(format!("https://piped.video/channel/{channel_id}")).await?.text().await?);
-
-            // println!("Response: {:?}", resp);
-            // let channel: Channel = serde_json::from_str(resp.as_str()).unwrap();
-
-            // println!("Channel: {:#?}", channel);
-        }
-
         // Construct the Channel object.
         let channel = Channel {
             rss_url: source.rss_url.clone(),
             category: source.category.clone().unwrap_or_default(),
-            link: base_url.to_string(),
             title,
             icon: favicon,
             dominant_color,
@@ -160,7 +135,6 @@ pub async fn get_channel_data(
         let channel_optional = ChannelOptional {
             rss_url: channel.rss_url.clone(),
             category: Some(channel.category.clone()),
-            link: Some(channel.link.clone()),
             title: Some(channel.title.clone()),
             icon: Some(channel.icon.clone()),
             dominant_color: Some(channel.dominant_color.clone()),
@@ -176,7 +150,6 @@ pub async fn get_channel_data(
         let channel = Channel {
             rss_url: source.rss_url.clone(),
             category: source.category.clone().unwrap_or_default(),
-            link: source.link.clone().unwrap_or_default(),
             title: source.title.clone().unwrap_or_default(),
             icon: source.icon.clone().unwrap_or_default(),
             dominant_color: source.dominant_color.clone().unwrap_or_default(),
