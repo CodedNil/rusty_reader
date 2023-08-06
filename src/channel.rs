@@ -10,6 +10,7 @@ use std::{collections::HashMap, io::Cursor};
 #[allow(clippy::module_name_repetitions)]
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct ChannelOptional {
+    pub category: Option<String>,
     pub rss_url: String,
     pub link: Option<String>,
     pub title: Option<String>,
@@ -19,6 +20,7 @@ pub struct ChannelOptional {
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct Channel {
+    pub category: String,
     pub rss_url: String,
     pub link: String,
     pub title: String,
@@ -63,89 +65,126 @@ fn store_channel_to_db(
 /// Function to retrieve a channel from the database or create it if it does not exist.
 pub async fn get_channel_data(
     db: &Db,
+    needs_fresh: bool,
     source: &ChannelOptional,
 ) -> Result<ChannelOptional, Box<dyn std::error::Error>> {
-    // If the channel is not in the database, fetch the page feed.
-    let response = reqwest::get(source.rss_url.clone()).await?;
-    let bytes = response.bytes().await?;
-    let cursor = Cursor::new(bytes);
-    let feed = parser::parse(cursor)?;
+    if needs_fresh {
+        // Fetch the page feed.
+        let response = reqwest::get(source.rss_url.clone()).await?;
+        let bytes = response.bytes().await?;
+        let cursor = Cursor::new(bytes);
+        let feed = parser::parse(cursor)?;
 
-    // Get first link or default to feed.id
-    let feed_link = feed
-        .links
-        .first()
-        .map_or(feed.id.clone(), |link| link.href.clone());
+        // Get first link or default to feed.id
+        let feed_link = feed
+            .links
+            .first()
+            .map_or(feed.id.clone(), |link| link.href.clone());
 
-    // Get the base URL
-    let parsed_url = url::Url::parse(feed_link.as_str())?;
-    let base_url = if let Some(host) = parsed_url.host_str() {
-        format!("{}://{}", parsed_url.scheme(), host)
+        // Get the base URL
+        let parsed_url = url::Url::parse(feed_link.as_str())?;
+        let base_url = if let Some(host) = parsed_url.host_str() {
+            format!("{}://{}", parsed_url.scheme(), host)
+        } else {
+            feed_link.clone()
+        };
+
+        // Download the webpage to parse the HTML content.
+        let channel_url = base_url.clone();
+        let is_youtube = base_url.contains("youtube.com");
+        let document = Html::parse_document(&reqwest::get(channel_url).await?.text().await?);
+
+        // Get page title
+        let title = if let Some(source_title) = source.title.clone() {
+            source_title
+        } else if is_youtube && feed.title.is_some() {
+            feed.title.unwrap().content
+        } else {
+            document
+                .select(&Selector::parse("title").unwrap())
+                .next()
+                .map(|element| element.inner_html())
+                .unwrap_or_default()
+        };
+
+        // Get favicon and extract its dominant color
+        let favicon = if let Some(source_icon) = source.icon.clone() {
+            source_icon
+        } else {
+            url::Url::parse(&base_url)?
+                .join("/favicon.ico")?
+                .to_string()
+        };
+        let dominant_color = if let Some(source_dominant_color) = source.dominant_color.clone() {
+            source_dominant_color
+        } else {
+            // Extract the dominant color from the image
+            get_dominant_color(
+                &image::load_from_memory(&reqwest::get(&favicon).await?.bytes().await?)
+                    .map_err(|_| format!("Failed to decode the image from {}", &favicon))?,
+            )
+            .unwrap_or("#000000".to_string())
+        };
+
+        // Custom youtube data
+        if is_youtube {
+            // println!("Youtube channel detected");
+            // let channel_id = source
+            //     .rss_url
+            //     .split('=')
+            //     .last()
+            //     .unwrap_or_default()
+            //     .to_string();
+
+            // let resp = reqwest::get(format!("https://piped.video/channel/{channel_id}"))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // // let document = Html::parse_document(&reqwest::get(format!("https://piped.video/channel/{channel_id}")).await?.text().await?);
+
+            // println!("Response: {:?}", resp);
+            // let channel: Channel = serde_json::from_str(resp.as_str()).unwrap();
+
+            // println!("Channel: {:#?}", channel);
+        }
+
+        // Construct the Channel object.
+        let channel = Channel {
+            rss_url: source.rss_url.clone(),
+            category: source.category.clone().unwrap_or_default(),
+            link: base_url.to_string(),
+            title,
+            icon: favicon,
+            dominant_color,
+        };
+        let channel_optional = ChannelOptional {
+            rss_url: channel.rss_url.clone(),
+            category: Some(channel.category.clone()),
+            link: Some(channel.link.clone()),
+            title: Some(channel.title.clone()),
+            icon: Some(channel.icon.clone()),
+            dominant_color: Some(channel.dominant_color.clone()),
+        };
+
+        // Store the newly constructed channel in the database.
+        println!("Channel: {channel:?}");
+        store_channel_to_db(db, &channel, &source.rss_url)?;
+
+        Ok(channel_optional)
     } else {
-        feed_link.clone()
-    };
+        // Store the fed channel in the database.
+        let channel = Channel {
+            rss_url: source.rss_url.clone(),
+            category: source.category.clone().unwrap_or_default(),
+            link: source.link.clone().unwrap_or_default(),
+            title: source.title.clone().unwrap_or_default(),
+            icon: source.icon.clone().unwrap_or_default(),
+            dominant_color: source.dominant_color.clone().unwrap_or_default(),
+        };
+        store_channel_to_db(db, &channel, &source.rss_url)?;
 
-    // Download the webpage to parse the HTML content.
-    let resp = reqwest::get(base_url.clone()).await?;
-    let body = resp.text().await?;
-    let document = Html::parse_document(&body);
-
-    // Get page title
-    let title = if let Some(source_title) = source.title.clone() {
-        source_title
-    } else {
-        let title_selector = Selector::parse("title").unwrap();
-        document
-            .select(&title_selector)
-            .next()
-            .map(|element| element.inner_html())
-            .unwrap_or_default()
-    };
-
-    // Get favicon and extract its dominant color
-    let favicon = if let Some(source_icon) = source.icon.clone() {
-        source_icon
-    } else {
-        url::Url::parse(&base_url)?
-            .join("/favicon.ico")?
-            .to_string()
-    };
-    let dominant_color = if let Some(source_dominant_color) = source.dominant_color.clone() {
-        source_dominant_color
-    } else {
-        // Fetch the favicon
-        let resp = reqwest::get(&favicon).await?;
-        let bytes = resp.bytes().await?;
-
-        // Decode the .ico
-        let img = image::load_from_memory(&bytes)
-            .map_err(|_| format!("Failed to decode the image from {}", &favicon))?;
-
-        // Extract the dominant color from the image
-        get_dominant_color(&img).unwrap_or("#000000".to_string())
-    };
-
-    // Construct the Channel object.
-    let channel = Channel {
-        rss_url: source.rss_url.clone(),
-        link: base_url.to_string(),
-        title,
-        icon: favicon,
-        dominant_color,
-    };
-    let channel_optional = ChannelOptional {
-        rss_url: channel.rss_url.clone(),
-        link: Some(channel.link.clone()),
-        title: Some(channel.title.clone()),
-        icon: Some(channel.icon.clone()),
-        dominant_color: Some(channel.dominant_color.clone()),
-    };
-
-    // Store the newly constructed channel in the database.
-    println!("Channel: {channel:?}");
-    store_channel_to_db(db, &channel, &source.rss_url)?;
-
-    Ok(channel_optional)
+        Ok(source.clone())
+    }
 }
 
 /// Get the dominant color from an image.

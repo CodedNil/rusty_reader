@@ -111,20 +111,19 @@ async fn pull_articles(db: Arc<Db>) {
     let mut new_rss = Vec::new();
     for feed in &config.rss {
         // If any of feeds variables are Option<None> then get new data
-        if feed.title.is_none() || feed.icon.is_none() || feed.dominant_color.is_none() {
-            let new_data = match channel::get_channel_data(&db.clone(), feed).await {
-                Ok(channel_data) => channel_data,
-                Err(e) => {
-                    eprintln!("Error getting channel data for {}: {}", feed.rss_url, e);
-                    continue;
-                }
-            };
-            // Overwrite the feed in config with new_data
-            new_rss.push(new_data.clone());
-            config_changed = true;
-        } else {
-            new_rss.push(feed.clone());
-        }
+        let needs_fresh =
+            feed.title.is_none() || feed.icon.is_none() || feed.dominant_color.is_none();
+        let new_data = match channel::get_channel_data(&db.clone(), needs_fresh, feed).await {
+            Ok(channel_data) => channel_data,
+            Err(e) => {
+                eprintln!("Error getting channel data for {}: {}", feed.rss_url, e);
+                new_rss.push(feed.clone());
+                continue;
+            }
+        };
+        // Overwrite the feed in config with new_data
+        new_rss.push(new_data.clone());
+        config_changed = true;
     }
     // Write config if anything has changed
     if config_changed {

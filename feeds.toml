@@ -1,4 +1,5 @@
 [[rss]]
+category = "informative"
 rss_url = "https://www.theverge.com/rss/index.xml"
 link = "https://www.theverge.com"
 title = "The Verge"
@@ -6,6 +7,7 @@ icon = "https://www.theverge.com/favicon.ico"
 dominant_color = "#5200ff"
 
 [[rss]]
+category = "informative"
 rss_url = "https://www.tomshardware.com/rss.xml"
 link = "https://www.tomshardware.com"
 title = "Tom's Hardware: For The Hardcore PC Enthusiast"
@@ -13,6 +15,7 @@ icon = "https://www.tomshardware.com/favicon.ico"
 dominant_color = "#d82329"
 
 [[rss]]
+category = "informative"
 rss_url = "https://hnrss.org/frontpage"
 link = "https://news.ycombinator.com"
 title = "Hacker News"
@@ -20,6 +23,7 @@ icon = "https://news.ycombinator.com/favicon.ico"
 dominant_color = "#ff6600"
 
 [[rss]]
+category = "informative"
 rss_url = "http://feeds.bbci.co.uk/news/technology/rss.xml"
 link = "https://www.bbc.co.uk"
 title = "BBC - Home"
@@ -27,8 +31,25 @@ icon = "https://www.bbc.co.uk/favicon.ico"
 dominant_color = "#dc143c"
 
 [[rss]]
+category = "informative"
 rss_url = "http://feeds.bbci.co.uk/news/science_and_environment/rss.xml"
 link = "https://www.bbc.co.uk"
 title = "BBC - Home"
 icon = "https://www.bbc.co.uk/favicon.ico"
 dominant_color = "#dc143c"
+
+[[rss]]
+category = "asoiaf"
+rss_url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCQzdMyuz0Lf4zo4uGcEujFw"
+link = "http://www.youtube.com"
+title = "GameofThrones"
+icon = "http://www.youtube.com/favicon.ico"
+dominant_color = "#ff0000"
+
+[[rss]]
+category = "entertainment"
+rss_url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCXuqSBlHAE6Xw-yeJA0Tunw"
+link = "http://www.youtube.com"
+title = "Linus Tech Tips"
+icon = "http://www.youtube.com/favicon.ico"
+dominant_color = "#ff0000"
