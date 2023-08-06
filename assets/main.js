@@ -109,6 +109,8 @@ const highlightCurrentArticle = () => {
         let article = articles[currentArticle[currentColumn]];
         article.classList.add("selected");
         article.style.backgroundColor = article.data.color_selected;
+        article.scrollIntoView({ behavior: "smooth", block: "center" });
+
         // Setup preview
         setupPreview(article);
     }
