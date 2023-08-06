@@ -80,10 +80,9 @@ const fetchArticles = async () => {
 };
 
 const highlightCurrentArticle = () => {
-    // Remove the 'selected' and 'first' class from all articles and boxes
+    // Remove the 'selected' class from all articles and boxes
     document.querySelectorAll(".article").forEach((el) => {
         el.classList.remove("selected");
-        el.classList.remove("first");
     });
     document.querySelectorAll(".articlebox-column").forEach((el) => {
         el.classList.remove("selected");
