@@ -104,14 +104,17 @@ async fn pull_articles(db: Arc<Db>) {
     ];
 
     for source in rss_sources {
-        let channel_data = match channel::get_channel_data(db.clone(), source).await {
+        // Pull the channel data if it doesn't exist
+        match channel::get_channel_data(db.clone(), source).await {
             Ok(channel_data) => channel_data,
             Err(e) => {
                 eprintln!("Error getting channel data for {source}: {e}");
                 continue;
             }
         };
-        match process_source(source, &channel_data.link, db.clone()).await {
+
+        // Pull the articles
+        match process_source(source, db.clone()).await {
             Ok(_) => {}
             Err(e) => eprintln!("Error processing source {source}: {e}"),
         }
@@ -158,11 +161,7 @@ async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Er
     })
 }
 
-async fn process_source(
-    source: &str,
-    channel_link: &str,
-    db: Arc<Db>,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn process_source(source: &str, db: Arc<Db>) -> Result<(), Box<dyn std::error::Error>> {
     println!("Processing source {source}");
     let response = reqwest::get(source).await?;
     let bytes = response.bytes().await?;
@@ -180,7 +179,7 @@ async fn process_source(
             .map_or(entry.id.clone(), |link| link.href.clone());
 
         // Check if the article is already in the database
-        if db.contains_key(&entry_link)? {
+        if db.contains_key(format!("article:{}", &entry_link))? {
             continue;
         }
 
@@ -188,7 +187,7 @@ async fn process_source(
         if let Ok(data) = scrape_website(&entry_link.clone()).await {
             let article = Article {
                 link: entry_link,
-                channel: channel_link.to_string().clone(),
+                channel: source.to_string().clone(),
                 title: entry_title,
                 published: entry_published.to_rfc3339(),
                 image: data.image.unwrap_or_default(),
@@ -203,8 +202,29 @@ async fn process_source(
     Ok(())
 }
 
+// Function to retrieve a article from the database based on its link.
+fn get_article_from_db(db: &Db, link: &str) -> Result<Article, Box<dyn std::error::Error>> {
+    // Construct the key for the database lookup using the provided link.
+    let key = format!("article:{link}");
+
+    // Attempt to retrieve the data associated with the key.
+    match db.get(key)? {
+        // If data is found, deserialize it from binary format to a Article struct.
+        Some(ivec) => {
+            let article: Article = deserialize(&ivec)?;
+            Ok(article)
+        }
+        // If no data is found, return an error.
+        None => Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Article not found",
+        ))),
+    }
+}
+
 /// Function to store a article into the database.
 fn store_article_to_db(db: &Db, article: &Article) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Storing article {}", article.link);
     db.insert(
         format!("article:{}", &article.link),
         sled::IVec::from(serialize(article)?),
@@ -252,6 +272,8 @@ async fn get_articles(db: Arc<Db>) -> impl IntoResponse {
         })
         .collect();
 
+    println!("Found {} articles", articles.len());
+
     Json(json!(articles))
 }
 
@@ -261,42 +283,40 @@ async fn update_article_status(
     Path((link, new_status)): Path<(String, String)>,
     db: Arc<Db>,
 ) -> impl IntoResponse {
-    // Try to get the key from the database
-    let value = match db.get(&link) {
-        Ok(Some(value)) => value,
-        Ok(None) => return Json(json!({"status": "error", "message": "Article not found"})),
-        Err(_) => return Json(json!({"status": "error", "message": "Database error"})),
+    // Decode link URI
+    let link: String = match urlencoding::decode(&link) {
+        Ok(link) => link.to_string(),
+        Err(e) => return Json(json!({"status": "error", "message": e.to_string()})),
     };
 
-    // Try to deserialize the value into an Article
-    let mut article: Article = match serde_json::from_slice(&value) {
+    // Try to get the article from the database
+    let mut article: Article = match get_article_from_db(&db, &link) {
         Ok(article) => article,
-        Err(e) => return Json(json!({"status": "error", "message": e.to_string()})),
+        Err(e) => {
+            return Json(
+                json!({"status": "error", "message": format!("Failed to get article from database: {}", e)}),
+            )
+        }
     };
 
     // Try to convert the new_status string to a ReadStatus
     let new_status_enum = match ReadStatus::from_str(&new_status) {
         Ok(status) => status,
-        Err(e) => return Json(json!({"status": "error", "message": e})),
+        Err(e) => {
+            return Json(
+                json!({"status": "error", "message": format!("Failed to convert new status to ReadStatus: {}", e)}),
+            )
+        }
     };
 
     // Update the read status
     article.read_status = new_status_enum;
 
-    // Try to serialize the updated article
-    let updated_value = match serde_json::to_vec(&article) {
-        Ok(value) => value,
-        Err(e) => return Json(json!({"status": "error", "message": e.to_string()})),
-    };
-
-    // Try to update the value in the database
-    if let Err(e) = db.insert(link, updated_value) {
-        return Json(json!({"status": "error", "message": e.to_string()}));
-    }
-
-    // Try to flush the database
-    if let Err(e) = db.flush() {
-        return Json(json!({"status": "error", "message": e.to_string()}));
+    // Store the updated article in the database
+    if let Err(e) = store_article_to_db(&db, &article) {
+        return Json(
+            json!({"status": "error", "message": format!("Failed to store updated article in database: {}", e)}),
+        );
     }
 
     // Return a success response

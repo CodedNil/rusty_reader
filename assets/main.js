@@ -43,8 +43,13 @@ const fetchArticles = async () => {
             `;
             articleElement.classList.add("article");
             articleElement.data = article;
-            articleElement.style.backgroundColor =
-                article.channel.dominant_color;
+
+            // Set the background color of the article to the dominant color of the channel
+            let dominantColor = article.channel.dominant_color;
+            let color = tinycolor(dominantColor).toHsl();
+            color.s = 0.5;
+            color.l = 0.5;
+            articleElement.style.backgroundColor = tinycolor(color).toString();
 
             if (article.read_status === Column.FRESH) {
                 columns[Column.FRESH].appendChild(articleElement);
@@ -228,6 +233,12 @@ document.addEventListener("keydown", async (event) => {
                 moveArticle(articleToMove, currentColumn, toColumn);
             }
             break;
+        // Press enter to open the article in a new tab
+        case "Enter":
+            if (columns[currentColumn].childElementCount !== 0) {
+                window.open(articles[currentArticle[currentColumn]].data.link);
+            }
+            break;
         // Undo
         case "z":
             if (event.ctrlKey && undoStack.length > 0) {
@@ -310,7 +321,7 @@ function format_time_ago(published) {
                     } else {
                         const months = days / 30;
                         if (months < 12) {
-                            return formatDecimal(months) + "m";
+                            return formatDecimal(months) + "mo";
                         } else {
                             return formatDecimal(days / 365) + "y";
                         }

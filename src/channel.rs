@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
+/// Struct to represent a channel.
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct Channel {
     pub link: String,
@@ -48,6 +49,7 @@ fn store_channel_to_db(
     Ok(())
 }
 
+/// Function to retrieve a channel from the database or create it if it does not exist.
 pub async fn get_channel_data(
     db: Arc<Db>,
     source: &str,
@@ -90,45 +92,28 @@ pub async fn get_channel_data(
         .map(|element| element.inner_html())
         .unwrap_or_default();
 
-    // Attempt to extract the favicon URL from the HTML.
-    let favicon_selector = Selector::parse("link[rel=\"shortcut icon\"]")?;
-    let favicon = document
-        .select(&favicon_selector)
-        .next()
-        .and_then(|element| element.value().attr("href"))
-        .and_then(|relative_url| url::Url::parse(source).ok()?.join(relative_url).ok())
-        .map(|url| url.to_string());
-
-    // If no favicon URL is found in the HTML, try fetching from the root of the domain.
-    let favicon = if favicon.is_none() {
-        let base_url_obj = url::Url::parse(&base_url)?;
-        let favicon_url = base_url_obj.join("/favicon.ico")?;
-        Some(favicon_url.to_string())
-    } else {
-        favicon
-    };
-
-    // If a favicon URL is found, fetch the image and extract its color palette.
-    let dominant_color = if let Some(favicon_url) = &favicon {
+    // Get favicon and extract its dominant color
+    let favicon = url::Url::parse(&base_url)?
+        .join("/favicon.ico")?
+        .to_string();
+    let dominant_color = {
         // Fetch the favicon
-        let resp = reqwest::get(favicon_url).await?;
+        let resp = reqwest::get(&favicon).await?;
         let bytes = resp.bytes().await?;
 
         // Decode the .ico
         let img = image::load_from_memory(&bytes)
-            .map_err(|_| format!("Failed to decode the image from {favicon_url}"))?;
+            .map_err(|_| format!("Failed to decode the image from {}", &favicon))?;
 
         // Extract the dominant color from the image
         get_dominant_color(&img)
-    } else {
-        None
     };
 
     // Construct the Channel object.
     let channel = Channel {
         link: base_url.to_string().clone(),
         title,
-        icon: favicon.unwrap_or_default(),
+        icon: favicon,
         dominant_color: dominant_color.unwrap_or("#000000".to_string()),
     };
 
@@ -140,6 +125,7 @@ pub async fn get_channel_data(
     Ok(channel)
 }
 
+/// Get the dominant color from an image.
 fn get_dominant_color(img: &DynamicImage) -> Option<String> {
     let mut color_count: HashMap<(u8, u8, u8), usize> = HashMap::new();
 

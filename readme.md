@@ -32,5 +32,3 @@ https://smallformfactor.net/
 Articles get summarised description, and title maybe? Show images for the article too
 
 Page background wallpaper ai driven, base on time of day, weather etc make a prompt for midjouney
-
-Use image-thief to get icons dominant colour, render the background of the article with that
