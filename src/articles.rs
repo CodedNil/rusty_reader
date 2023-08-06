@@ -77,8 +77,10 @@ async fn scrape_website(
 
             if main_content.is_some() {
                 // Use GPT3.5 to summarize the article
-                let summary =
-                    crate::gpt::summarise_article(db, title, main_content.unwrap()).await?;
+                let summary = crate::gpt::Summary {
+                    title,
+                    summary: main_content.unwrap(),
+                };
                 Some(summary)
             } else {
                 None
