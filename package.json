@@ -1,0 +1,25 @@
+{
+  "name": "rusty_reader",
+  "version": "1.0.0",
+  "description": "RSS feed reader",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "css": "node-sass --include-path scss assets/scss/style.scss assets/style.css",
+    "watch": "nodemon -e scss -x 'npm run css'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CodedNil/rusty_reader.git"
+  },
+  "author": "Dan Lock",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/CodedNil/rusty_reader/issues"
+  },
+  "homepage": "https://github.com/CodedNil/rusty_reader#readme",
+  "devDependencies": {
+    "node-sass": "^9.0.0",
+    "nodemon": "^3.0.1"
+  }
+}
