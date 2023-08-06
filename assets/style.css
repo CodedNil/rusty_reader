@@ -130,10 +130,6 @@ body {
     color: white;
 }
 
-.article-link:visited {
-    color: hsl(240, 8%, 75%);
-}
-
 .article-date {
     font-size: 11px;
     margin-left: 12px;

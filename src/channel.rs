@@ -4,11 +4,22 @@ use image::{DynamicImage, GenericImageView};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sled::Db;
-use std::{collections::HashMap, io::Cursor, sync::Arc};
+use std::{collections::HashMap, io::Cursor};
 
 /// Struct to represent a channel.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
+pub struct ChannelOptional {
+    pub rss_url: String,
+    pub link: Option<String>,
+    pub title: Option<String>,
+    pub icon: Option<String>,
+    pub dominant_color: Option<String>,
+}
+
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
 pub struct Channel {
+    pub rss_url: String,
     pub link: String,
     pub title: String,
     pub icon: String,
@@ -51,16 +62,11 @@ fn store_channel_to_db(
 
 /// Function to retrieve a channel from the database or create it if it does not exist.
 pub async fn get_channel_data(
-    db: Arc<Db>,
-    source: &str,
-) -> Result<Channel, Box<dyn std::error::Error>> {
-    // Attempt to retrieve the channel from the database.
-    if let Ok(channel) = get_channel_from_db(&db, source) {
-        return Ok(channel);
-    }
-
+    db: &Db,
+    source: &ChannelOptional,
+) -> Result<ChannelOptional, Box<dyn std::error::Error>> {
     // If the channel is not in the database, fetch the page feed.
-    let response = reqwest::get(source).await?;
+    let response = reqwest::get(source.rss_url.clone()).await?;
     let bytes = response.bytes().await?;
     let cursor = Cursor::new(bytes);
     let feed = parser::parse(cursor)?;
@@ -85,18 +91,28 @@ pub async fn get_channel_data(
     let document = Html::parse_document(&body);
 
     // Get page title
-    let title_selector = Selector::parse("title").unwrap();
-    let title = document
-        .select(&title_selector)
-        .next()
-        .map(|element| element.inner_html())
-        .unwrap_or_default();
+    let title = if let Some(source_title) = source.title.clone() {
+        source_title
+    } else {
+        let title_selector = Selector::parse("title").unwrap();
+        document
+            .select(&title_selector)
+            .next()
+            .map(|element| element.inner_html())
+            .unwrap_or_default()
+    };
 
     // Get favicon and extract its dominant color
-    let favicon = url::Url::parse(&base_url)?
-        .join("/favicon.ico")?
-        .to_string();
-    let dominant_color = {
+    let favicon = if let Some(source_icon) = source.icon.clone() {
+        source_icon
+    } else {
+        url::Url::parse(&base_url)?
+            .join("/favicon.ico")?
+            .to_string()
+    };
+    let dominant_color = if let Some(source_dominant_color) = source.dominant_color.clone() {
+        source_dominant_color
+    } else {
         // Fetch the favicon
         let resp = reqwest::get(&favicon).await?;
         let bytes = resp.bytes().await?;
@@ -106,23 +122,30 @@ pub async fn get_channel_data(
             .map_err(|_| format!("Failed to decode the image from {}", &favicon))?;
 
         // Extract the dominant color from the image
-        get_dominant_color(&img)
+        get_dominant_color(&img).unwrap_or("#000000".to_string())
     };
 
     // Construct the Channel object.
     let channel = Channel {
-        link: base_url.to_string().clone(),
+        rss_url: source.rss_url.clone(),
+        link: base_url.to_string(),
         title,
         icon: favicon,
-        dominant_color: dominant_color.unwrap_or("#000000".to_string()),
+        dominant_color,
+    };
+    let channel_optional = ChannelOptional {
+        rss_url: channel.rss_url.clone(),
+        link: Some(channel.link.clone()),
+        title: Some(channel.title.clone()),
+        icon: Some(channel.icon.clone()),
+        dominant_color: Some(channel.dominant_color.clone()),
     };
 
-    println!("Channel: {channel:?}");
-
     // Store the newly constructed channel in the database.
-    store_channel_to_db(&db, &channel, source)?;
+    println!("Channel: {channel:?}");
+    store_channel_to_db(db, &channel, &source.rss_url)?;
 
-    Ok(channel)
+    Ok(channel_optional)
 }
 
 /// Get the dominant color from an image.

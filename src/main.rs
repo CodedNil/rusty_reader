@@ -13,13 +13,17 @@ use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sled::Db;
+use std::{
+    fs::{read_to_string, write},
+    io::Cursor,
+    net::SocketAddr,
+    str::FromStr,
+    sync::Arc,
+};
 use tokio::time::{interval, Duration};
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
-
-// Standard library
-use std::{io::Cursor, net::SocketAddr, str::FromStr, sync::Arc};
 
 #[tokio::main]
 async fn main() {
@@ -93,30 +97,47 @@ struct Article {
     read_status: ReadStatus,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct Config {
+    rss: Vec<channel::ChannelOptional>,
+}
+
 /// Get articles and write them to the database
 async fn pull_articles(db: Arc<Db>) {
-    let rss_sources = vec![
-        "https://www.theverge.com/rss/index.xml",
-        "https://www.tomshardware.com/rss.xml",
-        "https://hnrss.org/frontpage",
-        "http://feeds.bbci.co.uk/news/technology/rss.xml",
-        "http://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
-    ];
+    // Read and parse the TOML file, grab needed info
+    let contents = read_to_string("feeds.toml").expect("Something went wrong reading the file");
+    let mut config: Config = toml::from_str(&contents).expect("Error parsing the TOML");
+    let mut config_changed = false;
+    let mut new_rss = Vec::new();
+    for feed in &config.rss {
+        // If any of feeds variables are Option<None> then get new data
+        if feed.title.is_none() || feed.icon.is_none() || feed.dominant_color.is_none() {
+            let new_data = match channel::get_channel_data(&db.clone(), feed).await {
+                Ok(channel_data) => channel_data,
+                Err(e) => {
+                    eprintln!("Error getting channel data for {}: {}", feed.rss_url, e);
+                    continue;
+                }
+            };
+            // Overwrite the feed in config with new_data
+            new_rss.push(new_data.clone());
+            config_changed = true;
+        } else {
+            new_rss.push(feed.clone());
+        }
+    }
+    // Write config if anything has changed
+    if config_changed {
+        config.rss = new_rss;
+        let toml = toml::to_string(&config).expect("Error serializing the TOML");
+        write("feeds.toml", toml).expect("Error writing to file");
+    }
 
-    for source in rss_sources {
-        // Pull the channel data if it doesn't exist
-        match channel::get_channel_data(db.clone(), source).await {
-            Ok(channel_data) => channel_data,
-            Err(e) => {
-                eprintln!("Error getting channel data for {source}: {e}");
-                continue;
-            }
-        };
-
-        // Pull the articles
-        match process_source(source, db.clone()).await {
+    // Pull the articles data
+    for source in config.rss {
+        match process_source(&source.rss_url, db.clone()).await {
             Ok(_) => {}
-            Err(e) => eprintln!("Error processing source {source}: {e}"),
+            Err(e) => eprintln!("Error processing source {}: {}", source.rss_url, e),
         }
     }
 }
@@ -161,7 +182,7 @@ async fn scrape_website(url: &str) -> Result<WebpageData, Box<dyn std::error::Er
     })
 }
 
-async fn process_source(source: &str, db: Arc<Db>) -> Result<(), Box<dyn std::error::Error>> {
+async fn process_source(source: &String, db: Arc<Db>) -> Result<(), Box<dyn std::error::Error>> {
     println!("Processing source {source}");
     let response = reqwest::get(source).await?;
     let bytes = response.bytes().await?;
