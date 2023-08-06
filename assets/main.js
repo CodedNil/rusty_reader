@@ -84,7 +84,7 @@ const highlightCurrentArticle = () => {
     document.querySelectorAll(".article").forEach((el) => {
         el.classList.remove("selected");
     });
-    document.querySelectorAll(".articlebox-column").forEach((el) => {
+    document.querySelectorAll(".articlebox").forEach((el) => {
         el.classList.remove("selected");
         el.parentElement.classList.remove("selected");
     });

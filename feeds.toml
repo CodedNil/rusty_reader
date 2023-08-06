@@ -14,13 +14,6 @@ dominant_color = "#d82329"
 
 [[rss]]
 category = "informative"
-rss_url = "https://hnrss.org/frontpage"
-title = "Hacker News"
-icon = "https://news.ycombinator.com/favicon.ico"
-dominant_color = "#ff6600"
-
-[[rss]]
-category = "informative"
 rss_url = "http://feeds.bbci.co.uk/news/technology/rss.xml"
 title = "BBC - Home"
 icon = "https://www.bbc.co.uk/favicon.ico"
