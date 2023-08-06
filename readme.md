@@ -25,3 +25,5 @@ https://smallformfactor.net/
 Page background wallpaper ai driven, base on time of day, weather etc make a prompt for midjouney
 
 Remove archived articles older than X days
+
+Error if gpt api fails

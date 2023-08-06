@@ -38,18 +38,31 @@ const fetchArticles = async () => {
 
             articleElement.innerHTML = `
                 <a class="article-link" href="${article.link}">${article.title}</a>
-                <div class="article-date">${published}</div>
-                <img class="article-icon" src="${article.channel.icon}">
+                <div class="article-details">
+                    <img class="article-icon" src="${article.channel.icon}">
+                    <div class="article-date">${published}</div>
+                </div>
             `;
             articleElement.classList.add("article");
-            articleElement.data = article;
 
             // Set the background color of the article to the dominant color of the channel
             let dominantColor = article.channel.dominant_color;
             let color = tinycolor(dominantColor).toHsl();
             color.s = 0.5;
-            color.l = 0.5;
+            color.l = 0.4;
+            let color_selected = tinycolor(dominantColor).toHsl();
+            color_selected.s = 0.6;
+            color_selected.l = 0.6;
+            if (article.read_status === Column.ARCHIVED) {
+                color.s = 0.3;
+                color_selected.s = 0.4;
+            }
             articleElement.style.backgroundColor = tinycolor(color).toString();
+
+            article.color = tinycolor(color).toString();
+            article.color_selected = tinycolor(color_selected).toString();
+
+            articleElement.data = article;
 
             if (article.read_status === Column.FRESH) {
                 columns[Column.FRESH].appendChild(articleElement);
@@ -83,6 +96,7 @@ const highlightCurrentArticle = () => {
     // Remove the 'selected' class from all articles and boxes
     document.querySelectorAll(".article").forEach((el) => {
         el.classList.remove("selected");
+        el.style.backgroundColor = el.data.color;
     });
     document.querySelectorAll(".articlebox").forEach((el) => {
         el.classList.remove("selected");
@@ -92,25 +106,14 @@ const highlightCurrentArticle = () => {
     // Add the 'selected' class to the current article in the current column and to the column
     const articles = columns[currentColumn].getElementsByClassName("article");
     if (articles.length > currentArticle[currentColumn]) {
-        articles[currentArticle[currentColumn]].classList.add("selected");
+        let article = articles[currentArticle[currentColumn]];
+        article.classList.add("selected");
+        article.style.backgroundColor = article.data.color_selected;
         // Setup preview
-        setupPreview(articles[currentArticle[currentColumn]]);
+        setupPreview(article);
     }
     columns[currentColumn].classList.add("selected");
     columns[currentColumn].parentElement.classList.add("selected");
-
-    // Reorder the articles in the current column
-    const selectedArticleIndex = currentArticle[currentColumn];
-    for (let i = 0; i < articles.length; i++) {
-        let newIndex = i - selectedArticleIndex;
-        if (i < selectedArticleIndex) {
-            newIndex = articles.length - selectedArticleIndex + i;
-        }
-        if (newIndex >= articles.length) {
-            newIndex = i - articles.length;
-        }
-        articles[i].style.order = newIndex;
-    }
 };
 
 const setupPreview = (articleElement) => {
