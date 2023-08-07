@@ -12,9 +12,9 @@ let currentArticle = JSON.parse(localStorage.getItem("currentArticle")) || {
 };
 
 const columns = {
-    [Column.FRESH]: null,
-    [Column.SAVED]: null,
-    [Column.ARCHIVED]: null,
+    [Column.FRESH]: document.getElementById("articles-center"),
+    [Column.SAVED]: document.getElementById("articles-left"),
+    [Column.ARCHIVED]: document.getElementById("articles-right"),
 };
 
 const fetchArticles = async () => {
@@ -24,10 +24,6 @@ const fetchArticles = async () => {
         for (const article of data) {
             article.published = new Date(article.published);
         }
-
-        columns[Column.FRESH] = document.getElementById("articles-center");
-        columns[Column.SAVED] = document.getElementById("articles-left");
-        columns[Column.ARCHIVED] = document.getElementById("articles-right");
 
         // Sort articles by recent first
         data.sort((a, b) => b.published - a.published);
@@ -76,8 +72,7 @@ const fetchArticles = async () => {
         // Ensure currentArticle is within bounds for each column
         for (const column in currentArticle) {
             if (currentArticle.hasOwnProperty(column)) {
-                const articles =
-                    columns[column].getElementsByClassName("article");
+                const articles = columns[column].getElementsByClassName("article");
                 if (currentArticle[column] >= articles.length) {
                     currentArticle[column] = 0;
                 }
@@ -119,227 +114,133 @@ const highlightCurrentArticle = () => {
 };
 
 const setupPreview = (articleElement) => {
-    const header = document.getElementById("preview-header");
-    const date = document.getElementById("preview-date");
-    const text = document.getElementById("preview-text");
-    const image = document.getElementById("preview-image");
-
-    header.innerHTML = articleElement.data.title;
-    date.innerHTML = articleElement.data.published.toDateString();
-    text.innerHTML = articleElement.data.summary;
-    image.src = articleElement.data.image;
+    document.getElementById("preview-header").innerHTML = articleElement.data.title;
+    document.getElementById("preview-date").innerHTML = articleElement.data.published.toDateString();
+    document.getElementById("preview-text").innerHTML = articleElement.data.summary;
+    document.getElementById("preview-image").src = articleElement.data.image;
 };
 
 const undoStack = [];
 const redoStack = [];
+const columnsMap = {
+    Fresh: { left: "Saved", right: "Archived" },
+    Saved: { left: "Archived", right: "Fresh" },
+    Archived: { left: "Fresh", right: "Saved" },
+};
 
 const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
     const fromColumn = columns[fromColumnStatus];
     const toColumn = columns[toColumnStatus];
 
     toColumn.appendChild(article);
+
+    // Push to undo stack
     undoStack.push({ article, fromColumn, toColumn });
     redoStack.length = 0; // Clear the redo stack whenever a new move is made
-    if (undoStack.length > 10) {
-        undoStack.shift();
-    }
+    if (undoStack.length > 10) undoStack.shift();
 
-    // Keep the current article in bounds
-    if (
-        currentArticle[currentColumn] >=
-        columns[currentColumn].childElementCount
-    ) {
-        currentArticle[currentColumn] = 0;
-    }
-
-    // Sort the articles in the destination column by date
-    Array.from(toColumn.children)
-        .sort((a, b) => b.data.published - a.data.published)
-        .forEach((articleElement) => toColumn.appendChild(articleElement));
+    sortArticlesByDate(toColumn);
 
     // Send a PUT request to the server to update the article's read status
-    const articleLink = encodeURIComponent(article.data.link);
-    fetch(`/articles/${articleLink}/${toColumnStatus}`, { method: "PUT" })
+    fetch(`/articles/${encodeURIComponent(article.data.link)}/${toColumnStatus}`, { method: "PUT" })
         .then((response) => response.json())
         .catch((error) => console.error("Error moving article:", error));
+
+    highlightCurrentArticle();
+};
+
+const sortArticlesByDate = (column) => {
+    Array.from(column.children)
+        .sort((a, b) => b.data.published - a.data.published)
+        .forEach((articleElement) => column.appendChild(articleElement));
 };
 
 document.addEventListener("keydown", async (event) => {
     const articles = columns[currentColumn].getElementsByClassName("article");
-    let articleToMove;
+    let changesMade = false;
 
     switch (event.key) {
-        // Select article to the left
         case "q":
-            // Change current column to the previous one
-            currentColumn =
-                currentColumn === Column.FRESH
-                    ? Column.SAVED
-                    : currentColumn === Column.SAVED
-                    ? Column.ARCHIVED
-                    : Column.FRESH;
-            localStorage.setItem("currentColumn", currentColumn);
-            break;
-        // Select column to the right
         case "e":
-            // Change current column to the next one
-            currentColumn =
-                currentColumn === Column.FRESH
-                    ? Column.ARCHIVED
-                    : currentColumn === Column.SAVED
-                    ? Column.FRESH
-                    : Column.SAVED;
+            currentColumn = columnsMap[currentColumn][event.key === "q" ? "left" : "right"];
             localStorage.setItem("currentColumn", currentColumn);
+            highlightCurrentArticle();
             break;
-        // Select article above
         case "w":
-            // Change current article to the previous one in the current column, cyclical
-            currentArticle[currentColumn] =
-                (currentArticle[currentColumn] - 1 + articles.length) %
-                articles.length;
-            localStorage.setItem(
-                "currentArticle",
-                JSON.stringify(currentArticle)
-            );
-            break;
-        // Select article below
         case "s":
-            // Change current article to the next one in the current column, cyclical
             currentArticle[currentColumn] =
-                (currentArticle[currentColumn] + 1) % articles.length;
-            localStorage.setItem(
-                "currentArticle",
-                JSON.stringify(currentArticle)
-            );
+                (currentArticle[currentColumn] + (event.key === "w" ? -1 : 1) + articles.length) % articles.length;
+            localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
+            highlightCurrentArticle();
             break;
-        // Move article left
         case "a":
-            if (columns[currentColumn].childElementCount !== 0) {
-                articleToMove = articles[currentArticle[currentColumn]];
-                const toColumn =
-                    currentColumn === Column.FRESH
-                        ? Column.SAVED
-                        : currentColumn === Column.SAVED
-                        ? Column.ARCHIVED
-                        : Column.FRESH;
-                moveArticle(articleToMove, currentColumn, toColumn);
-            }
-            break;
-        // Move article right
         case "d":
             if (columns[currentColumn].childElementCount !== 0) {
-                articleToMove = articles[currentArticle[currentColumn]];
-                const toColumn =
-                    currentColumn === Column.FRESH
-                        ? Column.ARCHIVED
-                        : currentColumn === Column.SAVED
-                        ? Column.FRESH
-                        : Column.SAVED;
+                const articleToMove = articles[currentArticle[currentColumn]];
+                const toColumn = columnsMap[currentColumn][event.key === "a" ? "left" : "right"];
                 moveArticle(articleToMove, currentColumn, toColumn);
             }
             break;
-        // Press enter to open the article in a new tab
         case "Enter":
-            if (columns[currentColumn].childElementCount !== 0) {
+            if (columns[currentColumn].childElementCount !== 0)
                 window.open(articles[currentArticle[currentColumn]].data.link);
-            }
             break;
-        // Undo
         case "z":
             if (event.ctrlKey && undoStack.length > 0) {
                 const { article, fromColumn, toColumn } = undoStack.pop();
-                redoStack.push({
-                    article,
-                    fromColumn: toColumn,
-                    toColumn: fromColumn,
-                });
+                redoStack.push({ article, fromColumn: toColumn, toColumn: fromColumn });
                 fromColumn.appendChild(article);
+                sortArticlesByDate(fromColumn);
+                highlightCurrentArticle();
             }
             break;
-        // Redo
         case "Z":
             if (event.ctrlKey && event.shiftKey && redoStack.length > 0) {
                 const { article, fromColumn, toColumn } = redoStack.pop();
-                undoStack.push({
-                    article,
-                    fromColumn: toColumn,
-                    toColumn: fromColumn,
-                });
+                undoStack.push({ article, fromColumn: toColumn, toColumn: fromColumn });
                 fromColumn.appendChild(article);
+                sortArticlesByDate(fromColumn);
+                highlightCurrentArticle();
             }
             break;
-        // Reset to first article in current column
         case "r":
             currentArticle[currentColumn] = 0;
-            localStorage.setItem(
-                "currentArticle",
-                JSON.stringify(currentArticle)
-            );
+            localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
+            highlightCurrentArticle();
             break;
     }
-
-    highlightCurrentArticle();
 });
 
 fetchArticles();
 
-// This function takes a date string as input and returns a string representing how much time has passed since that date.
-// The output format is as follows:
-// - Seconds if under a minute (e.g., "-5s")
-// - Minutes with 1 decimal place if under 10 minutes (e.g., "-4.5m")
-// - Just minutes if under 1 hour (e.g., "-20m")
-// - Hours with 1 decimal place if under 6 hours (e.g., "-1.5h")
-// - Just hours if under 24 hours
-// - Days with 1 decimal place if under a week
-// - Weeks with 1 decimal place if under a month
-// - Months with 1 decimal place if under a year
-// - Year with 1 decimal place after that
+// Formats the time difference between the current time and the provided date.
 function format_time_ago(published) {
-    // Calculate the duration between the current time and the published date
-    const duration = Math.floor(
-        (new Date().getTime() - published.getTime()) / 1000
-    );
+    // Calculate the duration in seconds between the current time and the published date.
+    const duration = (new Date().getTime() - published.getTime()) / 1000;
 
-    // Depending on the duration, format it in different ways
-    if (duration < 60) {
-        return duration + "s";
-    } else {
-        const mins = duration / 60;
-        if (mins < 10) {
-            return formatDecimal(mins) + "m";
-        } else if (mins < 60) {
-            return Math.floor(mins) + "m";
-        } else {
-            const hours = mins / 60;
-            if (hours < 6) {
-                return formatDecimal(hours) + "h";
-            } else if (hours < 24) {
-                return Math.floor(hours) + "h";
+    // Define units and their respective limits, divisors, labels, and whether they should be formatted with a decimal.
+    const units = [
+        { limit: 60, divisor: 1, label: "s" },
+        { limit: 600, divisor: 60, label: "m", decimal: true },
+        { limit: 3600, divisor: 60, label: "m" },
+        { limit: 21600, divisor: 3600, label: "h", decimal: true },
+        { limit: 86400, divisor: 3600, label: "h" },
+        { limit: 604800, divisor: 86400, label: "d", decimal: true },
+        { limit: 2419200, divisor: 604800, label: "w", decimal: true },
+        { limit: 29030400, divisor: 2592000, label: "mo", decimal: true }, // Assumes 30 days in a month.
+        { divisor: 31536000, label: "y", decimal: true },
+    ];
+
+    // Iterate through the units to determine the appropriate format.
+    for (let unit of units) {
+        if (duration < unit.limit || !unit.limit) {
+            const value = duration / unit.divisor;
+            if (unit.decimal) {
+                const formattedValue = value.toFixed(1);
+                return (formattedValue.endsWith(".0") ? formattedValue.slice(0, -2) : formattedValue) + unit.label;
             } else {
-                const days = hours / 24;
-                if (days < 7) {
-                    return formatDecimal(days) + "d";
-                } else {
-                    const weeks = days / 7;
-                    if (weeks < 4) {
-                        return formatDecimal(weeks) + "w";
-                    } else {
-                        const months = days / 30;
-                        if (months < 12) {
-                            return formatDecimal(months) + "mo";
-                        } else {
-                            return formatDecimal(days / 365) + "y";
-                        }
-                    }
-                }
+                return Math.floor(value) + unit.label;
             }
         }
     }
-}
-
-function formatDecimal(value) {
-    const formattedValue = value.toFixed(1);
-    return formattedValue.endsWith(".0")
-        ? formattedValue.slice(0, -2)
-        : formattedValue;
 }

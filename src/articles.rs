@@ -163,7 +163,6 @@ fn get_article_from_db(db: &Db, link: &str) -> Result<Article, Box<dyn std::erro
 
 /// Function to store a article into the database.
 fn store_article_to_db(db: &Db, article: &Article) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Storing article {}", article.link);
     let key = format!("article:{}", &article.link);
     db.insert(key, sled::IVec::from(serialize(article)?))?;
     db.flush()?;
