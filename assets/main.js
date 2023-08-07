@@ -4,6 +4,12 @@ const Column = {
     ARCHIVED: "Archived",
 };
 
+const columns = {
+    [Column.FRESH]: document.getElementById("articles-center"),
+    [Column.SAVED]: document.getElementById("articles-left"),
+    [Column.ARCHIVED]: document.getElementById("articles-right"),
+};
+
 let currentColumn = localStorage.getItem("currentColumn") || Column.FRESH;
 let currentArticle = JSON.parse(localStorage.getItem("currentArticle")) || {
     [Column.FRESH]: 0,
@@ -11,73 +17,58 @@ let currentArticle = JSON.parse(localStorage.getItem("currentArticle")) || {
     [Column.ARCHIVED]: 0,
 };
 
-const columns = {
-    [Column.FRESH]: document.getElementById("articles-center"),
-    [Column.SAVED]: document.getElementById("articles-left"),
-    [Column.ARCHIVED]: document.getElementById("articles-right"),
+const createArticleElement = (article) => {
+    const articleElement = document.createElement("div");
+    articleElement.classList.add("article");
+    articleElement.innerHTML = `
+        <a class="article-link" href="${article.link}">${article.title}</a>
+        <div class="article-details">
+            <img class="article-icon" src="${article.channel.icon}">
+            <div class="article-date">${format_time_ago(article.published)}</div>
+        </div>
+    `;
+
+    // Set the background color of the article to the dominant color of the channel
+    let dominantColor = article.channel.dominant_color;
+    let color = tinycolor(dominantColor).toHsl();
+    color.s = 0.5;
+    color.l = 0.4;
+    let color_selected = tinycolor(dominantColor).toHsl();
+    color_selected.s = 0.6;
+    color_selected.l = 0.6;
+    if (article.read_status === Column.ARCHIVED) {
+        color.s = 0.3;
+        color_selected.s = 0.4;
+    }
+    articleElement.style.backgroundColor = tinycolor(color).toString();
+
+    article.color = tinycolor(color).toString();
+    article.color_selected = tinycolor(color_selected).toString();
+
+    articleElement.data = article;
+
+    return articleElement;
 };
 
 const fetchArticles = async () => {
     try {
         const response = await fetch("/articles");
         const data = await response.json();
-        for (const article of data) {
-            article.published = new Date(article.published);
+
+        // Convert and sort articles
+        const articles = data
+            .map((article) => {
+                article.published = new Date(article.published);
+                return article;
+            })
+            .sort((a, b) => b.published - a.published);
+
+        const articleElements = articles.map(createArticleElement);
+
+        for (let i = 0; i < articles.length; i++) {
+            columns[articles[i].read_status].appendChild(articleElements[i]);
         }
 
-        // Sort articles by recent first
-        data.sort((a, b) => b.published - a.published);
-
-        for (const article of data) {
-            const articleElement = document.createElement("div");
-            const published = format_time_ago(article.published);
-
-            articleElement.innerHTML = `
-                <a class="article-link" href="${article.link}">${article.title}</a>
-                <div class="article-details">
-                    <img class="article-icon" src="${article.channel.icon}">
-                    <div class="article-date">${published}</div>
-                </div>
-            `;
-            articleElement.classList.add("article");
-
-            // Set the background color of the article to the dominant color of the channel
-            let dominantColor = article.channel.dominant_color;
-            let color = tinycolor(dominantColor).toHsl();
-            color.s = 0.5;
-            color.l = 0.4;
-            let color_selected = tinycolor(dominantColor).toHsl();
-            color_selected.s = 0.6;
-            color_selected.l = 0.6;
-            if (article.read_status === Column.ARCHIVED) {
-                color.s = 0.3;
-                color_selected.s = 0.4;
-            }
-            articleElement.style.backgroundColor = tinycolor(color).toString();
-
-            article.color = tinycolor(color).toString();
-            article.color_selected = tinycolor(color_selected).toString();
-
-            articleElement.data = article;
-
-            if (article.read_status === Column.FRESH) {
-                columns[Column.FRESH].appendChild(articleElement);
-            } else if (article.read_status === Column.SAVED) {
-                columns[Column.SAVED].appendChild(articleElement);
-            } else if (article.read_status === Column.ARCHIVED) {
-                columns[Column.ARCHIVED].appendChild(articleElement);
-            }
-        }
-
-        // Ensure currentArticle is within bounds for each column
-        for (const column in currentArticle) {
-            if (currentArticle.hasOwnProperty(column)) {
-                const articles = columns[column].getElementsByClassName("article");
-                if (currentArticle[column] >= articles.length) {
-                    currentArticle[column] = 0;
-                }
-            }
-        }
         // Save the possibly updated currentArticle back to localStorage
         localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
 
@@ -98,34 +89,38 @@ const highlightCurrentArticle = () => {
         el.parentElement.classList.remove("selected");
     });
 
-    // Add the 'selected' class to the current article in the current column and to the column
-    const articles = columns[currentColumn].getElementsByClassName("article");
-    if (articles.length > currentArticle[currentColumn]) {
-        let article = articles[currentArticle[currentColumn]];
-        article.classList.add("selected");
-        article.style.backgroundColor = article.data.color_selected;
-        article.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Find the article by its link in the current column
+    const articles = Array.from(columns[currentColumn].getElementsByClassName("article"));
+    let selectedArticle = articles.find((article) => article.data.link === currentArticle[currentColumn]);
+
+    // If the selected article isn't valid, select the first article in the current column
+    if (!selectedArticle && articles.length > 0) {
+        selectedArticle = articles[0];
+        currentArticle[currentColumn] = selectedArticle.data.link;
+        localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
+    }
+
+    if (selectedArticle) {
+        selectedArticle.classList.add("selected");
+        selectedArticle.style.backgroundColor = selectedArticle.data.color_selected;
+        selectedArticle.scrollIntoView({ behavior: "smooth", block: "center" });
 
         // Setup preview
-        setupPreview(article);
+        document.getElementById("preview-header").innerHTML = selectedArticle.data.title;
+        document.getElementById("preview-date").innerHTML = selectedArticle.data.published.toDateString();
+        document.getElementById("preview-text").innerHTML = selectedArticle.data.summary;
+        document.getElementById("preview-image").src = selectedArticle.data.image;
     }
     columns[currentColumn].classList.add("selected");
     columns[currentColumn].parentElement.classList.add("selected");
 };
 
-const setupPreview = (articleElement) => {
-    document.getElementById("preview-header").innerHTML = articleElement.data.title;
-    document.getElementById("preview-date").innerHTML = articleElement.data.published.toDateString();
-    document.getElementById("preview-text").innerHTML = articleElement.data.summary;
-    document.getElementById("preview-image").src = articleElement.data.image;
-};
-
 const undoStack = [];
 const redoStack = [];
 const columnsMap = {
-    Fresh: { left: "Saved", right: "Archived" },
-    Saved: { left: "Archived", right: "Fresh" },
-    Archived: { left: "Fresh", right: "Saved" },
+    [Column.FRESH]: { left: Column.SAVED, right: Column.ARCHIVED },
+    [Column.SAVED]: { left: Column.ARCHIVED, right: Column.FRESH },
+    [Column.ARCHIVED]: { left: Column.FRESH, right: Column.SAVED },
 };
 
 const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
@@ -150,14 +145,16 @@ const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
 };
 
 const sortArticlesByDate = (column) => {
+    const fragment = document.createDocumentFragment();
     Array.from(column.children)
         .sort((a, b) => b.data.published - a.data.published)
-        .forEach((articleElement) => column.appendChild(articleElement));
+        .forEach((articleElement) => fragment.appendChild(articleElement));
+    column.appendChild(fragment);
 };
 
 document.addEventListener("keydown", async (event) => {
-    const articles = columns[currentColumn].getElementsByClassName("article");
-    let changesMade = false;
+    const articles = Array.from(columns[currentColumn].getElementsByClassName("article"));
+    const currentIndex = articles.findIndex((article) => article.data.link === currentArticle[currentColumn]);
 
     switch (event.key) {
         case "q":
@@ -168,22 +165,28 @@ document.addEventListener("keydown", async (event) => {
             break;
         case "w":
         case "s":
-            currentArticle[currentColumn] =
-                (currentArticle[currentColumn] + (event.key === "w" ? -1 : 1) + articles.length) % articles.length;
+            const newIndex = (currentIndex + (event.key === "w" ? -1 : 1) + articles.length) % articles.length;
+            currentArticle[currentColumn] = articles[newIndex].data.link;
             localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
             highlightCurrentArticle();
             break;
         case "a":
         case "d":
             if (columns[currentColumn].childElementCount !== 0) {
-                const articleToMove = articles[currentArticle[currentColumn]];
+                const articleToMove = articles[currentIndex];
                 const toColumn = columnsMap[currentColumn][event.key === "a" ? "left" : "right"];
                 moveArticle(articleToMove, currentColumn, toColumn);
+
+                // Update the currentArticle for the source column
+                const nextArticle = articles[currentIndex + 1] || articles[currentIndex - 1];
+                currentArticle[currentColumn] = nextArticle ? nextArticle.data.link : null;
+                localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
             }
             break;
         case "Enter":
-            if (columns[currentColumn].childElementCount !== 0)
-                window.open(articles[currentArticle[currentColumn]].data.link);
+            if (currentArticle[currentColumn]) {
+                window.open(currentArticle[currentColumn]);
+            }
             break;
         case "z":
             if (event.ctrlKey && undoStack.length > 0) {
@@ -204,7 +207,15 @@ document.addEventListener("keydown", async (event) => {
             }
             break;
         case "r":
-            currentArticle[currentColumn] = 0;
+            for (let col in columns) {
+                const colArticles = Array.from(columns[col].getElementsByClassName("article"));
+                const firstArticle = colArticles[0];
+                if (firstArticle) {
+                    currentArticle[col] = firstArticle.data.link;
+                } else {
+                    currentArticle[col] = null;
+                }
+            }
             localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
             highlightCurrentArticle();
             break;

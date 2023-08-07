@@ -27,3 +27,5 @@ Page background wallpaper ai driven, base on time of day, weather etc make a pro
 Remove archived articles older than X days
 
 Error if gpt api fails
+
+Fix the article image retrieval, take it from the feed don't bother scraping the site
