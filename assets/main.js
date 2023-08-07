@@ -133,6 +133,12 @@ const highlightCurrentArticle = () => {
         document.getElementById("preview-date").innerHTML = selectedArticle.data.published.toDateString();
         document.getElementById("preview-text").innerHTML = selectedArticle.data.summary;
         document.getElementById("preview-image").src = selectedArticle.data.image;
+    } else {
+        // Clean preview
+        document.getElementById("preview-header").innerHTML = "";
+        document.getElementById("preview-date").innerHTML = "";
+        document.getElementById("preview-text").innerHTML = "";
+        document.getElementById("preview-image").src = "";
     }
     columns[currentColumn].classList.add("selected");
     columns[currentColumn].parentElement.classList.add("selected");
