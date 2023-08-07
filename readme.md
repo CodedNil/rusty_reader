@@ -2,9 +2,6 @@ RSS feed reader
 
 Frontend todo:
 Mobile view, with swipe to slide
-Keybind to toggle between sort by channel
-
-Make the current article variable reference the link not an index for consistency
 
 Workspaces? Have additional feeds like spam with reddit etc that you toggle on if you want to just browse for ages
 Also separate workspaces for certain topics outside of your main feeds

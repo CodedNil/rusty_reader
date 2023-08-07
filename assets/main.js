@@ -18,6 +18,12 @@ let currentArticle = JSON.parse(localStorage.getItem("currentArticle")) || {
     [Column.ARCHIVED]: 0,
 };
 
+const SortMode = {
+    DATE: "Date",
+    SOURCE: "Source",
+};
+let currentSortMode = localStorage.getItem("sortMode") || SortMode.DATE;
+
 const createArticleElement = (article) => {
     const articleElement = document.createElement("div");
     articleElement.classList.add("article");
@@ -74,18 +80,17 @@ const fetchArticles = async () => {
         const data = await response.json();
 
         // Convert and sort articles
-        const articles = data
-            .map((article) => {
-                article.published = new Date(article.published);
-                return article;
-            })
-            .sort((a, b) => b.published - a.published);
+        const articles = data.map((article) => {
+            article.published = new Date(article.published);
+            return article;
+        });
 
         const articleElements = articles.map(createArticleElement);
 
         for (let i = 0; i < articles.length; i++) {
             columns[articles[i].read_status].appendChild(articleElements[i]);
         }
+        sortColumnsByCurrentMode();
 
         // Save the possibly updated currentArticle back to localStorage
         localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
@@ -152,7 +157,7 @@ const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
     redoStack.length = 0; // Clear the redo stack whenever a new move is made
     if (undoStack.length > 10) undoStack.shift();
 
-    sortArticlesByDate(toColumn);
+    sortColumnByCurrentMode(toColumn);
 
     // Send a PUT request to the server to update the article's read status
     fetch(`/articles/${encodeURIComponent(article.data.link)}/${toColumnStatus}`, { method: "PUT" })
@@ -160,6 +165,32 @@ const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
         .catch((error) => console.error("Error moving article:", error));
 
     highlightCurrentArticle();
+};
+
+const sortColumnsByCurrentMode = () => {
+    for (let col in columns) {
+        if (currentSortMode === SortMode.DATE) {
+            sortArticlesByDate(columns[col]);
+        } else {
+            sortArticlesBySource(columns[col]);
+        }
+    }
+};
+
+const sortColumnByCurrentMode = (column) => {
+    if (currentSortMode === SortMode.DATE) {
+        sortArticlesByDate(column);
+    } else {
+        sortArticlesBySource(column);
+    }
+};
+
+const sortArticlesBySource = (column) => {
+    const fragment = document.createDocumentFragment();
+    Array.from(column.children)
+        .sort((a, b) => a.data.channel.rss_url.localeCompare(b.data.channel.rss_url))
+        .forEach((articleElement) => fragment.appendChild(articleElement));
+    column.appendChild(fragment);
 };
 
 const sortArticlesByDate = (column) => {
@@ -211,7 +242,7 @@ document.addEventListener("keydown", async (event) => {
                 const { article, fromColumn, toColumn } = undoStack.pop();
                 redoStack.push({ article, fromColumn: toColumn, toColumn: fromColumn });
                 fromColumn.appendChild(article);
-                sortArticlesByDate(fromColumn);
+                sortColumnByCurrentMode(fromColumn);
                 highlightCurrentArticle();
             }
             break;
@@ -220,7 +251,7 @@ document.addEventListener("keydown", async (event) => {
                 const { article, fromColumn, toColumn } = redoStack.pop();
                 undoStack.push({ article, fromColumn: toColumn, toColumn: fromColumn });
                 fromColumn.appendChild(article);
-                sortArticlesByDate(fromColumn);
+                sortColumnByCurrentMode(fromColumn);
                 highlightCurrentArticle();
             }
             break;
@@ -237,6 +268,10 @@ document.addEventListener("keydown", async (event) => {
             localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
             highlightCurrentArticle();
             break;
+        case "f":
+            currentSortMode = currentSortMode === SortMode.DATE ? SortMode.SOURCE : SortMode.DATE;
+            localStorage.setItem("sortMode", currentSortMode);
+            sortColumnsByCurrentMode();
     }
 });
 
