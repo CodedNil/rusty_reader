@@ -163,6 +163,7 @@ const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
     redoStack.length = 0; // Clear the redo stack whenever a new move is made
     if (undoStack.length > 10) undoStack.shift();
 
+    sortColumnByCurrentMode(fromColumn);
     sortColumnByCurrentMode(toColumn);
 
     // Send a PUT request to the server to update the article's read status
