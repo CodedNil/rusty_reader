@@ -9,6 +9,7 @@ const columns = {
     [Column.SAVED]: document.getElementById("articles-left"),
     [Column.ARCHIVED]: document.getElementById("articles-right"),
 };
+const columnsReverse = Object.fromEntries(Object.entries(columns).map(([k, v]) => [v.id, k]));
 
 let currentColumn = localStorage.getItem("currentColumn") || Column.FRESH;
 let currentArticle = JSON.parse(localStorage.getItem("currentArticle")) || {
@@ -28,6 +29,23 @@ const createArticleElement = (article) => {
         </div>
     `;
 
+    // Click to select article
+    articleElement.addEventListener("click", (event) => {
+        // If its in a different column, select that column
+        if (columns[currentColumn] !== articleElement.parentElement) {
+            currentColumn = columnsReverse[articleElement.parentElement.id];
+            localStorage.setItem("currentColumn", currentColumn);
+        }
+        // Select the article
+        currentArticle[currentColumn] = article.link;
+        localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
+        highlightCurrentArticle();
+
+        // Prevent the link from opening
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
     // Set the background color of the article to the dominant color of the channel
     let dominantColor = article.channel.dominant_color;
     let color = tinycolor(dominantColor).toHsl();
@@ -40,7 +58,7 @@ const createArticleElement = (article) => {
         color.s = 0.3;
         color_selected.s = 0.4;
     }
-    articleElement.style.backgroundColor = tinycolor(color).toString();
+    // articleElement.style.backgroundColor = tinycolor(color).toString();
 
     article.color = tinycolor(color).toString();
     article.color_selected = tinycolor(color_selected).toString();
@@ -82,7 +100,7 @@ const highlightCurrentArticle = () => {
     // Remove the 'selected' class from all articles and boxes
     document.querySelectorAll(".article").forEach((el) => {
         el.classList.remove("selected");
-        el.style.backgroundColor = el.data.color;
+        // el.style.backgroundColor = el.data.color;
     });
     document.querySelectorAll(".articlebox").forEach((el) => {
         el.classList.remove("selected");
@@ -102,7 +120,7 @@ const highlightCurrentArticle = () => {
 
     if (selectedArticle) {
         selectedArticle.classList.add("selected");
-        selectedArticle.style.backgroundColor = selectedArticle.data.color_selected;
+        // selectedArticle.style.backgroundColor = selectedArticle.data.color_selected;
         selectedArticle.scrollIntoView({ behavior: "smooth", block: "center" });
 
         // Setup preview
