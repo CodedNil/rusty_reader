@@ -77,9 +77,13 @@ async fn scrape_website(
 
             if main_content.is_some() {
                 // Use GPT3.5 to summarize the article
-                let summary =
-                    crate::gpt::summarise_article(db, title, main_content.unwrap()).await?;
-                Some(summary)
+                let summary = crate::gpt::summarise_article(db, title, main_content.unwrap()).await;
+                if summary.is_err() {
+                    println!("Error summarising article: {:?}", summary.err().unwrap());
+                    None
+                } else {
+                    Some(summary.unwrap())
+                }
             } else {
                 None
             }
@@ -120,6 +124,22 @@ pub async fn process_source(
             .first()
             .map_or(entry.id.clone(), |link| link.href.clone());
 
+        // Get first image in content if exists
+        let entry_image = entry
+            .content
+            .and_then(|content| content.body)
+            .and_then(|body| {
+                let document = Html::parse_document(&body);
+                let image = Selector::parse("img").ok().and_then(|selector| {
+                    document
+                        .select(&selector)
+                        .next()
+                        .and_then(|element| element.value().attr("src"))
+                        .map(String::from)
+                });
+                image
+            });
+
         // Check if the article is already in the database
         if !db.contains_key(format!("article:{}", &entry_link))? {
             // Download the webpage and extract the image
@@ -129,7 +149,7 @@ pub async fn process_source(
                     channel: source.clone(),
                     title: data.new_title.unwrap_or(entry_title),
                     published: entry_published.to_rfc3339(),
-                    image: data.image.unwrap_or_default(),
+                    image: entry_image.unwrap_or(data.image.unwrap_or_default()),
                     summary: data.summary.unwrap_or(entry_summary),
                     read_status: ReadStatus::Fresh,
                 };

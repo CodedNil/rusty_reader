@@ -35,6 +35,15 @@ pub async fn summarise_article(
         return Ok(summary);
     }
 
+    // Crop text to fit the limit of 4096 tokens (4 characters to a token on average) if necessary
+    let text = if text.len() > 4096 * 4 {
+        let mut text = text;
+        text.truncate(4096 * 4);
+        text
+    } else {
+        text
+    };
+
     // Use GPT3.5 to summarise the article and title
     let client = Client::new();
     let request = CreateChatCompletionRequestArgs::default()

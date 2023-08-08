@@ -110,24 +110,23 @@ body {
 #article-preview {
     background-color: var(--primary-color);
     opacity: 1;
+    gap: 0;
 }
 
 #preview-header {
     font-size: 24px;
     font-weight: bold;
-    margin-top: 0;
-    margin-bottom: var(--gap-medium);
+    margin: 0;
 }
 
 #preview-date {
     font-size: 14px;
-    margin: var(--gap-small) 0;
     color: var(--text-muted);
 }
 
 #preview-text {
     font-size: 16px;
-    margin: var(--gap-medium) 0 var(--gap-large);
+    margin: 0;
     line-height: 1.5;
 }
 

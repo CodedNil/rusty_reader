@@ -10,6 +10,12 @@ Frontend editor for subscribed channels, with import and export opml
 
 Offline reading
 
+New layout idea:
+Main preview and article list, on desktop side by side, on mobile preview top list bottom
+Buttons next to the currently selected article to save or archive it (or if viewing saved feed, just to archive it and opposite for archived)
+On mobile these buttons show but can also swipe left or right on the article or preview
+Buttons/tab bar to switch between fresh, saved and archived
+
 Backend todo:
 Summarise video transcript from youtube to make a description and a non clickbait title
 Show video thumbnail in list

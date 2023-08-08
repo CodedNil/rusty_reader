@@ -55,16 +55,16 @@ const createArticleElement = (article) => {
     // Set the background color of the article to the dominant color of the channel
     let dominantColor = article.channel.dominant_color;
     let color = tinycolor(dominantColor).toHsl();
-    color.s = 0.5;
-    color.l = 0.4;
+    color.s = 0.2;
+    color.l = 0.6;
     let color_selected = tinycolor(dominantColor).toHsl();
-    color_selected.s = 0.6;
+    color_selected.s = 0.3;
     color_selected.l = 0.6;
     if (article.read_status === Column.ARCHIVED) {
-        color.s = 0.3;
-        color_selected.s = 0.4;
+        color.s = 0.1;
+        color_selected.s = 0.2;
     }
-    // articleElement.style.backgroundColor = tinycolor(color).toString();
+    articleElement.style.backgroundColor = tinycolor(color).toString();
 
     article.color = tinycolor(color).toString();
     article.color_selected = tinycolor(color_selected).toString();
@@ -105,7 +105,7 @@ const highlightCurrentArticle = () => {
     // Remove the 'selected' class from all articles and boxes
     document.querySelectorAll(".article").forEach((el) => {
         el.classList.remove("selected");
-        // el.style.backgroundColor = el.data.color;
+        el.style.backgroundColor = el.data.color;
     });
     document.querySelectorAll(".articlebox").forEach((el) => {
         el.classList.remove("selected");
@@ -125,7 +125,7 @@ const highlightCurrentArticle = () => {
 
     if (selectedArticle) {
         selectedArticle.classList.add("selected");
-        // selectedArticle.style.backgroundColor = selectedArticle.data.color_selected;
+        selectedArticle.style.backgroundColor = selectedArticle.data.color_selected;
         selectedArticle.scrollIntoView({ behavior: "smooth", block: "center" });
 
         // Setup preview
