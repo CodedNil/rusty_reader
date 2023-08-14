@@ -62,7 +62,7 @@ async fn main() {
 
     // Wallpaper generator setup
     let wallpaper_generator = async {
-        let mut interval = interval(Duration::from_secs(120 * 60));
+        let mut interval = interval(Duration::from_secs(360 * 60));
         loop {
             interval.tick().await;
             println!("Generating wallpaper");
@@ -75,8 +75,8 @@ async fn main() {
                     // Attempt to generate the wallpaper image using the prompt
                     match wallpaper::generate_image(
                         &prompt,
-                        1536,
-                        640,
+                        1344,
+                        768,
                         wallpaper::WriteOption::Desktop,
                     )
                     .await
@@ -85,9 +85,9 @@ async fn main() {
                             // Log the successful generation of the wallpaper
                             println!("Wallpaper result: {wallpaper_result:?}");
                         }
-                        Err(_) => {
+                        Err(e) => {
                             // Log any errors encountered during wallpaper generation
-                            println!("Error generating wallpaper");
+                            println!("Error generating wallpaper {e}");
                         }
                     }
                 }

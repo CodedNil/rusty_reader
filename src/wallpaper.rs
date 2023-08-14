@@ -10,6 +10,7 @@ use std::{
 const URL: &str =
     "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image";
 
+#[allow(dead_code)]
 pub enum WriteOption {
     None,
     Desktop,
@@ -50,9 +51,9 @@ pub async fn generate_prompt() -> Result<String, Box<dyn std::error::Error>> {
     let weather = fetch_weather().await?;
 
     let input = format!(
-        "Using this data Date: {current_datetime}, Weather: {weather}, format a prompt for an image generator which creates a scenic wallpaper themed around the current weather time and date, season and seasonal/cultural events included for UK"
+        "Using this data Date: {current_datetime}, Weather: {weather}, format a prompt for an image generator which creates a scenic wallpaper themed around the current weather time and date, season and seasonal/cultural events included for UK, be very concise and create a short prompt, the prompt should be a description of the wallpaper written like 'Sunny afternoon in a british field wallpaper'"
     );
-    gpt::process(input).await
+    gpt::process(input, "gpt-4", 128u16).await
 }
 
 pub async fn generate_image(
@@ -91,8 +92,6 @@ pub async fn generate_image(
         .json()
         .await?;
 
-    println!("{:#?}", response);
-
     // Ensure the wallpapers directory exists
     create_dir_all("./wallpapers")?;
 
@@ -106,11 +105,18 @@ pub async fn generate_image(
         let img = image::load_from_memory(&decoded)?;
 
         // Save as WebP
-        let file_name = format!(
-            "./wallpapers/{}-{}.webp",
-            formatted_date,
-            prompt.replace(' ', "_").to_lowercase()
-        );
+        let sanitized_prompt = prompt
+            .chars()
+            .filter_map(|c| match c {
+                'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => Some(c.to_ascii_lowercase()),
+                ' ' => Some('_'),
+                _ => None,
+            })
+            .collect::<String>()
+            .chars()
+            .take(50)
+            .collect::<String>();
+        let file_name = format!("./wallpapers/{formatted_date}-{sanitized_prompt}.webp");
         let mut output = File::create(&file_name)?;
         img.write_to(&mut output, ImageOutputFormat::WebP)?;
 

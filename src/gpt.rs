@@ -47,7 +47,9 @@ pub async fn summarise_article(
     };
 
     // Use GPT3.5 to summarise the article and title
-    let credentials: toml::Value = toml::from_str(&std::fs::read_to_string("credentials.toml")?)?;
+    let credentials: toml::Value = toml::from_str(
+        &std::fs::read_to_string("credentials.toml").expect("Failed to read credentials file"),
+    )?;
     let api_key = credentials["openai_api_key"].as_str().unwrap();
     let config = OpenAIConfig::new().with_api_key(api_key);
     let client = Client::with_config(config);
@@ -95,15 +97,19 @@ pub async fn summarise_article(
     Ok(result)
 }
 
-pub async fn process(input: String) -> Result<String, Box<dyn Error>> {
+pub async fn process(
+    input: String,
+    model: &str,
+    max_tokens: u16,
+) -> Result<String, Box<dyn Error>> {
     // Use GPT3.5 to summarise the article and title
     let credentials: toml::Value = toml::from_str(&std::fs::read_to_string("credentials.toml")?)?;
     let api_key = credentials["openai_api_key"].as_str().unwrap();
     let config = OpenAIConfig::new().with_api_key(api_key);
     let client = Client::with_config(config);
     let request = CreateChatCompletionRequestArgs::default()
-        .max_tokens(1024u16)
-        .model("gpt-3.5-turbo")
+        .max_tokens(max_tokens)
+        .model(model)
         .messages([ChatCompletionRequestMessageArgs::default()
             .role(Role::User)
             .content(input)
