@@ -4,7 +4,9 @@ use axum::{
 };
 use bincode::{deserialize, serialize};
 use feed_rs::parser;
+use piped::PipedClient;
 use readability::extractor;
+use reqwest::Client;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -47,6 +49,12 @@ struct WebpageData {
     new_title: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Summary {
+    pub title: String,
+    pub summary: String,
+}
+
 /// Website scraping for data
 async fn scrape_website(
     db: Arc<Db>,
@@ -59,7 +67,7 @@ async fn scrape_website(
     let document = Html::parse_document(&body);
 
     // Get the first image
-    let image = Selector::parse("img").ok().and_then(|selector| {
+    let mut image = Selector::parse("img").ok().and_then(|selector| {
         document
             .select(&selector)
             .next()
@@ -68,23 +76,80 @@ async fn scrape_website(
     });
 
     // Get the main content using the readability crate
-    let summary = match url::Url::parse(url) {
+    let mut main_content = match url::Url::parse(url) {
         Ok(url_obj) => {
             let mut body_cursor = Cursor::new(body);
             let main_content = extractor::extract(&mut body_cursor, &url_obj)
                 .ok()
                 .map(|content| content.content);
-
-            if main_content.is_some() {
-                // Use GPT3.5 to summarize the article
-                let summary =
-                    crate::gpt::summarise_article(db, title, main_content.unwrap()).await?;
-                Some(summary)
-            } else {
-                None
-            }
+            Some(main_content.unwrap())
         }
         Err(_) => None,
+    };
+
+    // Youtube specific
+    let split_result = url.split('=').collect::<Vec<_>>();
+    let is_youtube = url.contains("youtube.com") && split_result.len() > 1;
+    if is_youtube {
+        let client = PipedClient::new(&Client::new(), "https://pipedapi.kavin.rocks");
+        if let Ok(video) = client.video_from_id(split_result.last().unwrap()).await {
+            // Set image to the videos thumbnail
+            image = Some(video.thumbnail_url);
+
+            // Set main content to the best subtitles source, the one that isnt auto generated
+            let best_subtitles = video
+                .subtitles
+                .iter()
+                .find(|subtitle| subtitle.auto_generated)
+                .or_else(|| {
+                    video
+                        .subtitles
+                        .iter()
+                        .find(|subtitle| !subtitle.auto_generated)
+                })
+                .map(|subtitle| subtitle.url.clone());
+            // If best subtitle exists, download the xml from url and parse out the text
+            if let Some(subtitle_url) = best_subtitles {
+                let resp = reqwest::get(subtitle_url).await?;
+                let body = resp.text().await?;
+
+                // Parse out the subtitle text
+                let mut text = String::new();
+                let mut start = 0;
+                while let Some(start_tag) = body[start..].find("<p ") {
+                    let start_pos = start + start_tag;
+                    if let Some(end_tag) = body[start_pos..].find("</p>") {
+                        let end_pos = start_pos + end_tag;
+                        let content_start = body[start_pos..].find('>').unwrap() + 1 + start_pos;
+                        let raw_text = &body[content_start..end_pos];
+
+                        // Decode HTML entities
+                        let decoded_text = html_escape::decode_html_entities(raw_text);
+
+                        text.push_str(&decoded_text);
+                        text.push(' ');
+                        start = end_pos + 4; // move past the </p> tag
+                    } else {
+                        break;
+                    }
+                }
+
+                main_content = Some(text);
+            }
+        }
+    }
+
+    // Use GPT3.5 to summarize the article
+    let summary = if main_content.is_some() {
+        let summary = crate::gpt::summarise_article(db, title, main_content.unwrap()).await;
+        if summary.is_err() {
+            println!("Error summarising article: {:?}", summary.err().unwrap());
+            None
+        } else {
+            Some(summary.unwrap())
+        }
+    } else {
+        None
     };
 
     if let Some(summary) = summary {
@@ -94,11 +159,10 @@ async fn scrape_website(
             new_title: Some(summary.title),
         });
     }
-    Ok(WebpageData {
-        image,
-        summary: None,
-        new_title: None,
-    })
+    Err(Box::new(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "Failed to scrape website",
+    )))
 }
 
 pub async fn process_source(
@@ -120,6 +184,22 @@ pub async fn process_source(
             .first()
             .map_or(entry.id.clone(), |link| link.href.clone());
 
+        // Get first image in content if exists
+        let entry_image = entry
+            .content
+            .and_then(|content| content.body)
+            .and_then(|body| {
+                let document = Html::parse_document(&body);
+                let image = Selector::parse("img").ok().and_then(|selector| {
+                    document
+                        .select(&selector)
+                        .next()
+                        .and_then(|element| element.value().attr("src"))
+                        .map(String::from)
+                });
+                image
+            });
+
         // Check if the article is already in the database
         if !db.contains_key(format!("article:{}", &entry_link))? {
             // Download the webpage and extract the image
@@ -129,7 +209,7 @@ pub async fn process_source(
                     channel: source.clone(),
                     title: data.new_title.unwrap_or(entry_title),
                     published: entry_published.to_rfc3339(),
-                    image: data.image.unwrap_or_default(),
+                    image: entry_image.unwrap_or(data.image.unwrap_or_default()),
                     summary: data.summary.unwrap_or(entry_summary),
                     read_status: ReadStatus::Fresh,
                 };
@@ -163,7 +243,6 @@ fn get_article_from_db(db: &Db, link: &str) -> Result<Article, Box<dyn std::erro
 
 /// Function to store a article into the database.
 fn store_article_to_db(db: &Db, article: &Article) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Storing article {}", article.link);
     let key = format!("article:{}", &article.link);
     db.insert(key, sled::IVec::from(serialize(article)?))?;
     db.flush()?;

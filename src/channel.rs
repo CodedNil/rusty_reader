@@ -1,6 +1,8 @@
 use bincode::{deserialize, serialize};
 use feed_rs::parser;
 use image::{DynamicImage, GenericImageView};
+use piped::PipedClient;
+use reqwest::Client;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use sled::Db;
@@ -93,7 +95,7 @@ pub async fn get_channel_data(
         let document = Html::parse_document(&reqwest::get(channel_url).await?.text().await?);
 
         // Get page title
-        let title = if let Some(source_title) = source.title.clone() {
+        let mut title = if let Some(source_title) = source.title.clone() {
             source_title
         } else if is_youtube && feed.title.is_some() {
             feed.title.unwrap().content
@@ -105,14 +107,25 @@ pub async fn get_channel_data(
                 .unwrap_or_default()
         };
 
-        // Get favicon and extract its dominant color
-        let favicon = if let Some(source_icon) = source.icon.clone() {
+        // Get favicon
+        let mut favicon = if let Some(source_icon) = source.icon.clone() {
             source_icon
         } else {
             url::Url::parse(&base_url)?
                 .join("/favicon.ico")?
                 .to_string()
         };
+        // Youtube specific title and icon with piped
+        if is_youtube {
+            let channel_id = source.rss_url.split('=').last().unwrap().to_string();
+            let client = PipedClient::new(&Client::new(), "https://pipedapi.kavin.rocks");
+            let channel = client.channel_from_id(channel_id).await.unwrap();
+
+            title = channel.name;
+            favicon = channel.avatar_url;
+        }
+
+        // Extract dominant color
         let dominant_color = if let Some(source_dominant_color) = source.dominant_color.clone() {
             source_dominant_color
         } else {
@@ -170,8 +183,8 @@ fn get_dominant_color(img: &DynamicImage) -> Option<String> {
         let b = pixel[2];
         let a = pixel[3];
 
-        // Skip transparent pixels
-        if a == 0 {
+        // Skip transparent and pure white pixels
+        if a == 0 || (r == 255 && g == 255 && b == 255) {
             continue;
         }
 
