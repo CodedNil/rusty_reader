@@ -1,6 +1,5 @@
 use crate::articles::Summary;
 use async_openai::{
-    config::OpenAIConfig,
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs, Role},
     Client,
 };
@@ -47,12 +46,7 @@ pub async fn summarise_article(
     };
 
     // Use GPT3.5 to summarise the article and title
-    let credentials: toml::Value = toml::from_str(
-        &std::fs::read_to_string("credentials.toml").expect("Failed to read credentials file"),
-    )?;
-    let api_key = credentials["openai_api_key"].as_str().unwrap();
-    let config = OpenAIConfig::new().with_api_key(api_key);
-    let client = Client::with_config(config);
+    let client = Client::new();
 
     let request = CreateChatCompletionRequestArgs::default()
         .max_tokens(1024u16)
@@ -103,10 +97,7 @@ pub async fn process(
     max_tokens: u16,
 ) -> Result<String, Box<dyn Error>> {
     // Use GPT3.5 to summarise the article and title
-    let credentials: toml::Value = toml::from_str(&std::fs::read_to_string("credentials.toml")?)?;
-    let api_key = credentials["openai_api_key"].as_str().unwrap();
-    let config = OpenAIConfig::new().with_api_key(api_key);
-    let client = Client::with_config(config);
+    let client = Client::new();
     let request = CreateChatCompletionRequestArgs::default()
         .max_tokens(max_tokens)
         .model(model)

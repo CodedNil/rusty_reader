@@ -62,10 +62,6 @@ pub async fn generate_image(
     height: u32,
     write_option: WriteOption,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Load API key from credentials.toml
-    let credentials: toml::Value = toml::from_str(&std::fs::read_to_string("credentials.toml")?)?;
-    let api_key = credentials["stable_diffusion_api"].as_str().unwrap();
-
     let body = serde_json::json!({
         "steps": 50,
         "width": width,
@@ -81,6 +77,7 @@ pub async fn generate_image(
     });
 
     let client = reqwest::Client::new();
+    let api_key = std::env::var("STABLE_DIFFUSION_API_KEY").unwrap();
     let response: serde_json::Value = client
         .post(URL)
         .header("Accept", "application/json")
