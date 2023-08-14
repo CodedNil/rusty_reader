@@ -7,13 +7,6 @@ dominant_color = "#5200ff"
 
 [[rss]]
 category = "informative"
-rss_url = "https://www.tomshardware.com/rss.xml"
-title = "Tom's Hardware: For The Hardcore PC Enthusiast"
-icon = "https://www.tomshardware.com/favicon.ico"
-dominant_color = "#d82329"
-
-[[rss]]
-category = "informative"
 rss_url = "http://feeds.bbci.co.uk/news/technology/rss.xml"
 title = "BBC - Home"
 icon = "https://www.bbc.co.uk/favicon.ico"
@@ -30,12 +23,12 @@ dominant_color = "#dc143c"
 category = "asoiaf"
 rss_url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCQzdMyuz0Lf4zo4uGcEujFw"
 title = "GameofThrones"
-icon = "http://www.youtube.com/favicon.ico"
-dominant_color = "#ff0000"
+icon = "https://pipedproxy.kavin.rocks/ytc/AOPolaQHL4C2izzkfiuRwuv43mPsky8mCpk_Jmq9oKvznw=s48-c-k-c0x00ffffff-no-rw?host=yt3.googleusercontent.com"
+dominant_color = "#181721"
 
 [[rss]]
 category = "entertainment"
 rss_url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCXuqSBlHAE6Xw-yeJA0Tunw"
 title = "Linus Tech Tips"
-icon = "http://www.youtube.com/favicon.ico"
-dominant_color = "#ff0000"
+icon = "https://pipedproxy.kavin.rocks/Vy6KL7EM_apxPSxF0pPy5w_c87YDTOlBQo3MADDF0Wl51kwxmt9wmRotnt2xQXwlrcyO0Xe56w=s48-c-k-c0x00ffffff-no-rw?host=yt3.googleusercontent.com"
+dominant_color = "#fe4d00"

@@ -35,10 +35,10 @@ pub async fn summarise_article(
         return Ok(summary);
     }
 
-    // Crop text to fit the limit of 4096 tokens (4 characters to a token on average) if necessary
-    let text = if text.len() > 4096 * 4 {
+    // Crop text to fit the limit of 4096 tokens (3 characters to a token on average) if necessary
+    let text = if text.len() > 4096 * 3 {
         let mut text = text;
-        text.truncate(4096 * 4);
+        text.truncate(4096 * 3);
         text
     } else {
         text
