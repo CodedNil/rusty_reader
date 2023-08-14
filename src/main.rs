@@ -1,6 +1,7 @@
 mod articles;
 mod channel;
 mod gpt;
+mod wallpaper;
 
 use axum::{
     extract::Path,
@@ -59,6 +60,45 @@ async fn main() {
         }
     };
 
+    // Wallpaper generator setup
+    let wallpaper_generator = async {
+        let mut interval = interval(Duration::from_secs(120 * 60));
+        loop {
+            interval.tick().await;
+            println!("Generating wallpaper");
+            // Attempt to generate a prompt for the wallpaper
+            match wallpaper::generate_prompt().await {
+                Ok(prompt) => {
+                    // Log the generated prompt
+                    println!("Prompt result: {prompt:?}");
+
+                    // Attempt to generate the wallpaper image using the prompt
+                    match wallpaper::generate_image(
+                        &prompt,
+                        1536,
+                        640,
+                        wallpaper::WriteOption::Desktop,
+                    )
+                    .await
+                    {
+                        Ok(wallpaper_result) => {
+                            // Log the successful generation of the wallpaper
+                            println!("Wallpaper result: {wallpaper_result:?}");
+                        }
+                        Err(_) => {
+                            // Log any errors encountered during wallpaper generation
+                            println!("Error generating wallpaper");
+                        }
+                    }
+                }
+                Err(prompt_result) => {
+                    // Log any errors encountered during prompt generation
+                    println!("Error generating prompt {prompt_result:?}");
+                }
+            }
+        }
+    };
+
     // Run server and article puller concurrently
     tokio::select! {
         _ = server => {
@@ -66,6 +106,9 @@ async fn main() {
         }
         _ = article_puller => {
             eprintln!("Article puller exited.");
+        }
+        _ = wallpaper_generator => {
+            eprintln!("Wallpaper generator exited.");
         }
     }
 }

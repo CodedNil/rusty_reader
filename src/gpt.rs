@@ -1,5 +1,6 @@
 use crate::articles::Summary;
 use async_openai::{
+    config::OpenAIConfig,
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs, Role},
     Client,
 };
@@ -46,7 +47,11 @@ pub async fn summarise_article(
     };
 
     // Use GPT3.5 to summarise the article and title
-    let client = Client::new();
+    let credentials: toml::Value = toml::from_str(&std::fs::read_to_string("credentials.toml")?)?;
+    let api_key = credentials["openai_api_key"].as_str().unwrap();
+    let config = OpenAIConfig::new().with_api_key(api_key);
+    let client = Client::with_config(config);
+
     let request = CreateChatCompletionRequestArgs::default()
         .max_tokens(1024u16)
         .model(model)
@@ -86,6 +91,33 @@ pub async fn summarise_article(
     let ivec = serialize(&result)?;
     db.insert(key, ivec)?;
     db.flush()?;
+
+    Ok(result)
+}
+
+pub async fn process(input: String) -> Result<String, Box<dyn Error>> {
+    // Use GPT3.5 to summarise the article and title
+    let credentials: toml::Value = toml::from_str(&std::fs::read_to_string("credentials.toml")?)?;
+    let api_key = credentials["openai_api_key"].as_str().unwrap();
+    let config = OpenAIConfig::new().with_api_key(api_key);
+    let client = Client::with_config(config);
+    let request = CreateChatCompletionRequestArgs::default()
+        .max_tokens(1024u16)
+        .model("gpt-3.5-turbo")
+        .messages([ChatCompletionRequestMessageArgs::default()
+            .role(Role::User)
+            .content(input)
+            .build()?])
+        .build()?;
+    let response = client.chat().create(request).await?;
+    let result = response
+        .choices
+        .first()
+        .unwrap()
+        .message
+        .content
+        .clone()
+        .unwrap();
 
     Ok(result)
 }
