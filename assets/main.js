@@ -170,8 +170,6 @@ const moveArticle = (article, fromColumnStatus, toColumnStatus) => {
     fetch(`/articles/${encodeURIComponent(article.data.link)}/${toColumnStatus}`, { method: "PUT" })
         .then((response) => response.json())
         .catch((error) => console.error("Error moving article:", error));
-
-    highlightCurrentArticle();
 };
 
 const sortColumnsByCurrentMode = () => {
@@ -237,6 +235,8 @@ document.addEventListener("keydown", async (event) => {
                 const nextArticle = articles[currentIndex + 1] || articles[currentIndex - 1];
                 currentArticle[currentColumn] = nextArticle ? nextArticle.data.link : null;
                 localStorage.setItem("currentArticle", JSON.stringify(currentArticle));
+
+                highlightCurrentArticle();
             }
             break;
         case "Enter":

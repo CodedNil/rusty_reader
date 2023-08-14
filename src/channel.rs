@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::{collections::HashMap, io::Cursor};
 
-const PIPED_INSTANCE: &'static str = "https://pipedapi.kavin.rocks";
-
 /// Struct to represent a channel.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Deserialize, Serialize, PartialEq, Clone, Debug)]
@@ -119,9 +117,8 @@ pub async fn get_channel_data(
         };
         // Youtube specific title and icon with piped
         if is_youtube {
-            println!("Youtube channel detected, using piped to get title and icon");
             let channel_id = source.rss_url.split('=').last().unwrap().to_string();
-            let client = PipedClient::new(&Client::new(), PIPED_INSTANCE);
+            let client = PipedClient::new(&Client::new(), "https://pipedapi.kavin.rocks");
             let channel = client.channel_from_id(channel_id).await.unwrap();
 
             title = channel.name;
