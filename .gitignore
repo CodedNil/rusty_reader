@@ -1,7 +1,5 @@
 /target
 /database
-/dist
-/node_modules
 /wallpapers
 credentials.toml
 assets/background.webp
