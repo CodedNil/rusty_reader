@@ -51,7 +51,7 @@ pub async fn generate_prompt() -> Result<String, Box<dyn std::error::Error>> {
     let weather = fetch_weather().await?;
 
     let input = format!(
-        "Using this data Date: {current_datetime}, Weather: {weather}, format a prompt for an image generator which creates a scenic wallpaper themed around the current weather time and date, season and seasonal/cultural events included for UK, be very concise and create a short prompt, the prompt should be a description of the wallpaper written like 'Sunny afternoon in a british field wallpaper'"
+        "Using this data Date: {current_datetime}, Weather: {weather}, format a prompt for an image generator which creates a scenic wallpaper, season and seasonal/cultural events included for UK, be very concise and create a short prompt, the prompt should be a description of the wallpaper written like these examples 'Sunny afternoon in a british field wallpaper' 'Sunset over a foggy city wallpaper' 'Snowy night in a forest wallpaper', be creative and use interesting art styles"
     );
     gpt::process(input, "gpt-4", 128u16).await
 }
@@ -77,7 +77,8 @@ pub async fn generate_image(
     });
 
     let client = reqwest::Client::new();
-    let api_key = std::env::var("STABLE_DIFFUSION_API_KEY").unwrap();
+    let api_key =
+        std::env::var("STABLE_DIFFUSION_API_KEY").expect("STABLE_DIFFUSION_API_KEY not set");
     let response: serde_json::Value = client
         .post(URL)
         .header("Accept", "application/json")
