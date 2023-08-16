@@ -1,6 +1,6 @@
 use crate::gpt;
 use base64::{engine::general_purpose, Engine};
-use chrono::Utc;
+use chrono::{Timelike, Utc};
 use image::ImageOutputFormat;
 use std::{
     fs::{create_dir_all, File},
@@ -19,9 +19,10 @@ pub enum WriteOption {
 
 async fn fetch_weather() -> Result<String, Box<dyn std::error::Error>> {
     let response: serde_json::Value = reqwest::get("https://api.open-meteo.com/v1/forecast?latitude=52.6369&longitude=-1.1398&current_weather=true").await?.json().await?;
-    let temperature = response["current_weather"]["temperature"]
+    let temperature: isize = response["current_weather"]["temperature"]
         .as_f64()
-        .unwrap_or(0.0);
+        .unwrap_or(0.0)
+        .round() as isize;
     let weathercode = response["current_weather"]["weathercode"]
         .as_u64()
         .unwrap_or(0);
@@ -43,15 +44,36 @@ async fn fetch_weather() -> Result<String, Box<dyn std::error::Error>> {
         _ => "Unknown weather",
     };
 
-    Ok(format!("{temperature:.2}°C, {weather_description}"))
+    let temperature_description = match temperature {
+        t if t <= -10 => "freezing cold",
+        -10..=-1 => "very cold",
+        0 => "just below freezing",
+        1..=10 => "cold",
+        11..=20 => "cool",
+        21..=25 => "mild",
+        26..=30 => "warm",
+        31..=35 => "hot",
+        t if t > 35 => "very hot",
+        _ => unreachable!(),
+    };
+
+    Ok(format!("{temperature_description} {weather_description}"))
 }
 
 pub async fn generate_prompt() -> Result<String, Box<dyn std::error::Error>> {
-    let current_datetime = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let date = Utc::now().format("%Y-%m-%d").to_string();
+    let time = match Utc::now().hour() {
+        5..=7 => "early morning",
+        8..=11 => "morning",
+        12..=15 => "afternoon",
+        16..=18 => "late-afternoon",
+        19..=21 => "evening",
+        _ => "night",
+    };
     let weather = fetch_weather().await?;
 
     let input = format!(
-        "Using this data Date: {current_datetime}, Weather: {weather}, format a prompt for an image generator which creates a scenic wallpaper, season and seasonal/cultural events included for UK, be very concise and create a short prompt, the prompt should be a description of the wallpaper written like these examples 'Sunny afternoon in a british field wallpaper' 'Sunset over a foggy city wallpaper' 'Snowy night in a forest wallpaper', be creative and use interesting art styles"
+        "With a few words describe an image for a computers wallpaper that represents the current weather, date and time, {time} {date} {weather}"
     );
     gpt::process(input, "gpt-4", 128u16).await
 }
