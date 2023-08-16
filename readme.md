@@ -1,4 +1,4 @@
-RSS feed reader
+A lightweight rust based RSS feed reader
 
 Frontend todo:
 Mobile view, with swipe to slide

@@ -3,6 +3,7 @@ use axum::{
     response::{IntoResponse, Json},
 };
 use feed_rs::parser;
+use futures::{stream, StreamExt};
 use piped::PipedClient;
 use readability::extractor;
 use reqwest::Client;
@@ -174,48 +175,59 @@ pub async fn process_source(
     let cursor = Cursor::new(bytes);
     let feed = parser::parse(cursor)?;
 
-    for entry in feed.entries {
-        let entry_title = entry.title.map_or(String::new(), |t| t.content);
-        let entry_summary = entry.summary.map_or(String::new(), |s| s.content);
-        let entry_published = entry.published.unwrap_or_default();
-        let entry_link = entry
-            .links
-            .first()
-            .map_or(entry.id.clone(), |link| link.href.clone());
+    stream::iter(feed.entries.iter())
+        .for_each_concurrent(4, |entry| {
+            let db = db.clone();
+            let source = source.clone();
+            async move {
+                let entry_title = entry.title.clone().map_or(String::new(), |t| t.content);
+                let entry_summary = entry.summary.clone().map_or(String::new(), |s| s.content);
+                let entry_published = entry.published.unwrap_or_default();
+                let entry_link = entry
+                    .links
+                    .first()
+                    .map_or(entry.id.clone(), |link| link.href.clone());
 
-        // Get first image in content if exists
-        let entry_image = entry
-            .content
-            .and_then(|content| content.body)
-            .and_then(|body| {
-                let document = Html::parse_document(&body);
-                let image = Selector::parse("img").ok().and_then(|selector| {
-                    document
-                        .select(&selector)
-                        .next()
-                        .and_then(|element| element.value().attr("src"))
-                        .map(String::from)
-                });
-                image
-            });
+                // Get first image in content if exists
+                let entry_image = entry
+                    .content
+                    .clone()
+                    .and_then(|content| content.body)
+                    .and_then(|body| {
+                        let document = Html::parse_document(&body);
+                        let image = Selector::parse("img").ok().and_then(|selector| {
+                            document
+                                .select(&selector)
+                                .next()
+                                .and_then(|element| element.value().attr("src"))
+                                .map(String::from)
+                        });
+                        image
+                    });
 
-        // Check if the article is already in the database
-        if !db.contains_key(format!("article:{}", &entry_link))? {
-            // Download the webpage and extract the image
-            if let Ok(data) = scrape_website(db.clone(), entry_title.clone(), &entry_link).await {
-                let article = Article {
-                    link: entry_link,
-                    channel: source.clone(),
-                    title: data.new_title.unwrap_or(entry_title),
-                    published: entry_published.to_rfc3339(),
-                    image: entry_image.unwrap_or(data.image.unwrap_or_default()),
-                    summary: data.summary.unwrap_or(entry_summary),
-                    read_status: ReadStatus::Fresh,
-                };
-                store_article_to_db(&db, &article)?;
-            };
-        }
-    }
+                // Check if the article is already in the database
+                if let Ok(false) = db.contains_key(format!("article:{}", &entry_link)) {
+                    // Download the webpage and extract the image
+                    if let Ok(data) =
+                        scrape_website(db.clone(), entry_title.clone(), &entry_link).await
+                    {
+                        let article = Article {
+                            link: entry_link,
+                            channel: source.clone(),
+                            title: data.new_title.unwrap_or(entry_title),
+                            published: entry_published.to_rfc3339(),
+                            image: entry_image.unwrap_or(data.image.unwrap_or_default()),
+                            summary: data.summary.unwrap_or(entry_summary),
+                            read_status: ReadStatus::Fresh,
+                        };
+                        if let Err(e) = store_article_to_db(&db, &article) {
+                            eprintln!("Error storing article to database: {e}");
+                        }
+                    };
+                }
+            }
+        })
+        .await;
 
     Ok(())
 }

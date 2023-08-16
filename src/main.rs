@@ -8,6 +8,7 @@ use axum::{
     routing::{get, put},
     Router,
 };
+use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::{
@@ -147,9 +148,14 @@ async fn pull_articles(db: Arc<Db>) {
         write("feeds.toml", toml).expect("Failed to write to file");
     }
 
-    for source in config.rss {
-        if let Err(e) = articles::process_source(&source.rss_url, db.clone()).await {
-            eprintln!("Error processing source {}: {}", source.rss_url, e);
-        }
-    }
+    stream::iter(config.rss.iter())
+        .for_each_concurrent(2, |source| {
+            let db = db.clone();
+            async move {
+                if let Err(e) = articles::process_source(&source.rss_url, db).await {
+                    eprintln!("Error processing source {}: {}", source.rss_url, e);
+                }
+            }
+        })
+        .await;
 }
