@@ -2,7 +2,6 @@ use axum::{
     extract::Path,
     response::{IntoResponse, Json},
 };
-use bincode::{deserialize, serialize};
 use feed_rs::parser;
 use piped::PipedClient;
 use readability::extractor;
@@ -230,7 +229,7 @@ fn get_article_from_db(db: &Db, link: &str) -> Result<Article, Box<dyn std::erro
     match db.get(key)? {
         // If data is found, deserialize it from binary format to a Article struct.
         Some(ivec) => {
-            let article: Article = deserialize(&ivec)?;
+            let article: Article = serde_json::from_slice(&ivec)?;
             Ok(article)
         }
         // If no data is found, return an error.
@@ -244,7 +243,8 @@ fn get_article_from_db(db: &Db, link: &str) -> Result<Article, Box<dyn std::erro
 /// Function to store a article into the database.
 fn store_article_to_db(db: &Db, article: &Article) -> Result<(), Box<dyn std::error::Error>> {
     let key = format!("article:{}", &article.link);
-    db.insert(key, sled::IVec::from(serialize(article)?))?;
+    let ivec = serde_json::to_vec(&article)?;
+    db.insert(key, ivec)?;
     db.flush()?;
     Ok(())
 }
@@ -268,7 +268,7 @@ pub async fn get_articles(db: Arc<Db>) -> impl IntoResponse {
         .scan_prefix("article:")
         .filter_map(Result::ok)
         .filter_map(|(_, value)| {
-            let article: Article = deserialize(&value).ok()?;
+            let article: Article = serde_json::from_slice(&value).ok()?;
             let channel = crate::channel::get_channel_from_db(&db, &article.channel).ok()?;
             Some(FullArticle {
                 link: article.link,
@@ -302,7 +302,7 @@ pub async fn update_article_status(
         Ok(article) => article,
         Err(e) => {
             return Json(
-                json!({"status": "error", "message": format!("Failed to get article from database: {}", e)}),
+                json!({"status": "error", "message": format!("Failed to get article from database: {e}")}),
             )
         }
     };
@@ -312,7 +312,7 @@ pub async fn update_article_status(
         Ok(status) => status,
         Err(e) => {
             return Json(
-                json!({"status": "error", "message": format!("Failed to convert new status to ReadStatus: {}", e)}),
+                json!({"status": "error", "message": format!("Failed to convert new status to ReadStatus: {e}")}),
             )
         }
     };
@@ -321,7 +321,7 @@ pub async fn update_article_status(
     article.read_status = new_status_enum;
     if let Err(e) = store_article_to_db(&db, &article) {
         return Json(
-            json!({"status": "error", "message": format!("Failed to store updated article in database: {}", e)}),
+            json!({"status": "error", "message": format!("Failed to store updated article in database: {e}")}),
         );
     }
 

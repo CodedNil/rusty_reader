@@ -1,4 +1,3 @@
-use bincode::{deserialize, serialize};
 use feed_rs::parser;
 use image::{DynamicImage, GenericImageView};
 use piped::PipedClient;
@@ -37,7 +36,7 @@ pub fn get_channel_from_db(db: &Db, link: &str) -> Result<Channel, Box<dyn std::
     match db.get(key)? {
         // If data is found, deserialize it from binary format to a Channel struct.
         Some(ivec) => {
-            let channel: Channel = deserialize(&ivec)?;
+            let channel: Channel = serde_json::from_slice(&ivec)?;
             Ok(channel)
         }
         // If no data is found, return an error.
@@ -54,10 +53,8 @@ fn store_channel_to_db(
     channel: &Channel,
     link: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    db.insert(
-        format!("channel:{link}"),
-        sled::IVec::from(serialize(channel)?),
-    )?;
+    let ivec = serde_json::to_vec(&channel)?;
+    db.insert(format!("channel:{link}"), ivec)?;
     db.flush()?;
     Ok(())
 }

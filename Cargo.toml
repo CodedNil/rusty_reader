@@ -4,27 +4,33 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# Web Frameworks and Utilities
 axum = "0.6"
 axum-extra = "0.7"
-tokio = { version = "1.0", features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.4", features = ["fs", "compression-br"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+reqwest = { version = "0.11", features = ["json"] }
+
+# Serialization and Data Handling
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.11", features = ["json"] }
-scraper = "0.17"
-sled = "0.34"
-chrono = { version = "0.4", features = ["serde"] }
-readability = "0.2"
-url = "2.4"
-feed-rs = "1.3"
-bincode = "1.3"
-image = { version = "0.24", features = ["webp-encoder"]}
-urlencoding = "2.1"
 toml = "0.7"
-async-openai = "0.13"
-piped = "0.0.4"
+sled = "0.34"
+
+# Web Scraping and Content Parsing
+url = "2.4"
+urlencoding = "2.1"
+scraper = "0.17"
+readability = "0.2"
+feed-rs = "1.3"
 html-escape = "0.2"
+piped = "0.0.4"
+
+# Miscellaneous
+chrono = { version = "0.4", features = ["serde"] }
+image = { version = "0.24", features = ["webp-encoder"]}
+tokio = { version = "1.0", features = ["full"] }
+async-openai = "0.13"
 base64 = "0.21"

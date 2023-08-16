@@ -3,7 +3,6 @@ use async_openai::{
     types::{ChatCompletionRequestMessageArgs, CreateChatCompletionRequestArgs, Role},
     Client,
 };
-use bincode::{deserialize, serialize};
 use sled::Db;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
@@ -25,7 +24,7 @@ pub async fn summarise_article(
     let key = format!("summary:{}", compute_hash(&format!("{title}{text}")));
     if db.contains_key(key.clone())? {
         let ivec = db.get(key.clone())?.unwrap();
-        let summary: Summary = deserialize(&ivec)?;
+        let summary: Summary = serde_json::from_slice(&ivec)?;
         return Ok(summary);
     }
 
@@ -84,7 +83,7 @@ pub async fn summarise_article(
     };
 
     // Store the summary in the database
-    let ivec = serialize(&result)?;
+    let ivec = serde_json::to_vec(&result)?;
     db.insert(key, ivec)?;
     db.flush()?;
 
