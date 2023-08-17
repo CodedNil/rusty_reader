@@ -7,5 +7,7 @@ FROM debian:bullseye-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates
 COPY --from=build /app/target/release/rusty_reader .
+COPY --from=build /app/feeds.toml .
+COPY --from=build /app/assets .
 EXPOSE 3000
 CMD ["./rusty_reader"]
