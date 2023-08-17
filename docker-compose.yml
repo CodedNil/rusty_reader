@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+    rusty_reader:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - "3000:3000"
+        volumes:
+            - ./feeds.toml:/app/feeds.toml
+            - ./assets:/app/assets
+        environment:
+            - OPENAI_API_KEY=${OPENAI_API_KEY}
+            - STABLE_DIFFUSION_API_KEY=${STABLE_DIFFUSION_API_KEY}
