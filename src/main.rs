@@ -74,14 +74,7 @@ async fn main() {
                     println!("Prompt result: {prompt:?}");
 
                     // Attempt to generate the wallpaper image using the prompt
-                    match wallpaper::generate_image(
-                        &prompt,
-                        1344,
-                        768,
-                        wallpaper::WriteOption::Desktop,
-                    )
-                    .await
-                    {
+                    match wallpaper::generate_image(&prompt).await {
                         Ok(wallpaper_result) => {
                             // Log the successful generation of the wallpaper
                             println!("Wallpaper result: {wallpaper_result:?}");

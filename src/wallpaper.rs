@@ -7,16 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-const URL: &str =
-    "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image";
-
-#[allow(dead_code)]
-pub enum WriteOption {
-    None,
-    Desktop,
-    Mobile,
-}
-
+#[allow(clippy::cast_possible_truncation)]
 async fn fetch_weather() -> Result<String, Box<dyn std::error::Error>> {
     let response: serde_json::Value = reqwest::get("https://api.open-meteo.com/v1/forecast?latitude=52.6369&longitude=-1.1398&current_weather=true").await?.json().await?;
     let temperature: isize = response["current_weather"]["temperature"]
@@ -73,21 +64,16 @@ pub async fn generate_prompt() -> Result<String, Box<dyn std::error::Error>> {
     let weather = fetch_weather().await?;
 
     let input = format!(
-        "With a few words describe an image for a computers wallpaper that represents the current weather, date and time, {time} {date} {weather}"
+        "With less than 6 words describe an image for a computers wallpaper that represents the current weather, date and time, {time} {date} {weather}"
     );
     gpt::process(input, "gpt-4", 128u16).await
 }
 
-pub async fn generate_image(
-    prompt: &str,
-    width: u32,
-    height: u32,
-    write_option: WriteOption,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn generate_image(prompt: &str) -> Result<(), Box<dyn std::error::Error>> {
     let body = serde_json::json!({
         "steps": 50,
-        "width": width,
-        "height": height,
+        "width": 1344,
+        "height": 768,
         "seed": 0,
         "cfg_scale": 7,
         "samples": 1,
@@ -102,7 +88,7 @@ pub async fn generate_image(
     let api_key =
         std::env::var("STABLE_DIFFUSION_API_KEY").expect("STABLE_DIFFUSION_API_KEY not set");
     let response: serde_json::Value = client
-        .post(URL)
+        .post("https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image")
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {api_key}"))
@@ -140,19 +126,9 @@ pub async fn generate_image(
         let mut output = File::create(&file_name)?;
         img.write_to(&mut output, ImageOutputFormat::WebP)?;
 
-        match write_option {
-            WriteOption::Desktop => {
-                create_dir_all("./assets")?;
-                let mut bg_output = File::create("./assets/background.webp")?;
-                img.write_to(&mut bg_output, ImageOutputFormat::WebP)?;
-            }
-            WriteOption::Mobile => {
-                create_dir_all("./assets")?;
-                let mut bg_mobile_output = File::create("./assets/background_mobile.webp")?;
-                img.write_to(&mut bg_mobile_output, ImageOutputFormat::WebP)?;
-            }
-            WriteOption::None => {}
-        }
+        create_dir_all("./assets")?;
+        let mut bg_output = File::create("./assets/background.webp")?;
+        img.write_to(&mut bg_output, ImageOutputFormat::WebP)?;
     }
 
     Ok(())
