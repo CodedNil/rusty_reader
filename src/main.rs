@@ -46,7 +46,7 @@ async fn main() {
         .layer(ServiceBuilder::new().layer(CompressionLayer::new()));
 
     // Server setup
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("Listening on {addr}");
     let server = axum::Server::bind(&addr).serve(app.into_make_service());
 
